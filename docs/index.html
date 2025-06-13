@@ -5,57 +5,101 @@
   <meta charset="UTF-8" />
   <title>BusyBox Web Demo (WASM via elfconv)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.17.0/css/xterm.css" />
+  <style>
+    /* Body flex to center terminals */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Style for individual command tokens */
+    .cmd {
+      background-color: #f0f0f0;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    /* Terminal containers width and centering via parent flex */
+    .terminal {
+      width: 80%;
+      max-width: 800px;
+      margin: 1em 0;
+    }
+
+    .big-text {
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+  </style>
 </head>
 
 <body>
   <header style="text-align:center; margin-bottom:1em;">
-    <h1>BusyBox Web Demo</h1>
+    <h1>Demo page for WebAssembly via elfconv</h1>
     <p>
-      This is a browser-based BusyBox demo, compiled to WebAssembly using the <strong>elfconv</strong> binary
-      translator.
+      <span class="big-text">This is a browser-based WebAssembly demo page, compiled to WebAssembly using the</span> <a
+        href="https://github.com/yomaytk/elfconv" target="_blank" class="big-text"><strong>elfconv</strong></a> <span
+        class="">binary translator.</span>
     </p>
+    <hr style="border:0; height:1px; background:#ccc; width:90%; margin:2em auto;" />
+    <h2 style="font-size:1.5em; font-weight:normal; color:#555; margin-top:0; margin-bottom:0.5em;">BusyBox Shell
+      Environment</h2>
     <p>
-      The following commands have been verified to work in this demo:
+      At least, the following commands have been verified to work:
+      <br><br>
+      <span>
+        <span class="cmd">arch</span>,
+        <span class="cmd">ascii</span>,
+        <span class="cmd">basename</span>,
+        <span class="cmd">busybox</span>,
+        <span class="cmd">cd</span>,
+        <span class="cmd">clear</span>,
+        <span class="cmd">date</span>,
+        <span class="cmd">echo</span>,
+        <span class="cmd">hostname</span>,
+        <span class="cmd">ls</span>,
+        <span class="cmd">mkdir</span>,
+        <span class="cmd">pwd</span>,
+        <span class="cmd">rm</span>,
+        <span class="cmd">rmdir</span>,
+        <span class="cmd">tree</span>,
+        <span class="cmd">uname</span>
+      </span>
     </p>
-    <ul style="list-style-type:disc; margin-left:2em; text-align:left; display:inline-block;">
-      <li>pwd</li>
-      <li>mkdir</li>
-      <li>arch</li>
-      <li>uname</li>
-      <li>ls</li>
-      <li>ascii</li>
-      <li>basename</li>
-      <li>echo</li>
-      <li>cd</li>
-      <li>hostname</li>
-      <li>date</li>
-      <li>rm</li>
-      <li>rmdir</li>
-      <li>clear</li>
-      <li>tree</li>
-    </ul>
   </header>
 
-  <div id="terminal"></div>
+  <!-- First terminal instance -->
+  <div id="terminal1" class="terminal"></div>
+  <!-- Second terminal instance -->
+  <!-- <div id="terminal2" class="terminal"></div> -->
 
   <script type="module">
     import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
     import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.9.4/index.js';
     import initEmscripten from './exe.js';
 
-    var xterm = new Terminal();
-    xterm.open(document.getElementById('terminal'));
+    // First terminal setup
+    const xterm1 = new Terminal();
+    xterm1.open(document.getElementById('terminal1'));
+    const { master: master1, slave: slave1 } = openpty();
+    xterm1.loadAddon(master1);
+    initEmscripten({ pty: slave1 });
 
-    // Create master/slave objects
-    const { master, slave } = openpty();
-
-    // Connect the master object to xterm.js
-    xterm.loadAddon(master);
-
-    await initEmscripten({
-      pty: slave
-    });
+    // // Second terminal setup
+    // const xterm2 = new Terminal();
+    // xterm2.open(document.getElementById('terminal2'));
+    // const { master: master2, slave: slave2 } = openpty();
+    // xterm2.loadAddon(master2);
+    // initEmscripten({ pty: slave2 });
   </script>
+
 </body>
+
+<footer style="text-align:center; margin:2em 0; color:#777; font-size:0.9em;">
+  More to come…
+</footer>
 
 </html>
