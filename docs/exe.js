@@ -7,7 +7,6 @@ var ModuleBusyBox = (() => {
       readyPromiseResolve = resolve;
       readyPromiseReject = reject
     });
-    var moduleOverrides = Object.assign({}, Module);
     var ENVIRONMENT_IS_WEB = true;
     var ENVIRONMENT_IS_WORKER = false;
     ModuleBusyBox["expectedDataFileDownloads"] ??= 0;

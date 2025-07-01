@@ -50,6 +50,30 @@
       font-size: 1.2em;
       font-weight: bold;
     }
+
+    #runButton:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      background-color: #ccc;
+      color: #f3f1f1;
+      border: 1px solid #bbb;
+      transition: none;
+      pointer-events: none;
+    }
+
+    #runButton.enabled {
+      opacity: 1;
+      cursor: pointer;
+      background-color: #98f798;
+      color: rgb(3, 4, 3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s, box-shadow 0.3s;
+    }
+
+    #runButton.enabled:hover {
+      background-color: #20c043;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
   </style>
 </head>
 
@@ -105,10 +129,15 @@
 
   <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">How fast is
     elfconv's Wasm?</h2>
-  <p>The following two ...</p>
+  <p>Comparing the execution speed of the <a href="https://github.com/AndrewCarterUK/mnist-neural-network-plain-c">mnist
+      neural network</a> Linux application on elfconv versus <a
+      href="https://github.com/container2wasm/container2wasm">container2wasm</a>. Left: elfconv;
+    Right: container2wasm.</p>
 
   <!-- Run ボタン -->
-  <button id="runButton">Run</button>
+  <div class="run_button">
+    <span id="button_status">Please wait for initializing ... </span><button id="runButton">Run</button>
+  </div>
 
   <!-- Container for side-by-side terminals -->
   <div class="terminals-container">
@@ -122,90 +151,79 @@
     More to come…
   </footer>
 
-  <!-- BusyBox 用スクリプト -->
+  <script src="./container2wasm-docs/load.js"></script>
   <script type="module">
     import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
     import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.9.4/index.js';
 
     import initEmscriptenBusyBox from './exe.js';
-
-    const term1 = new Terminal();
-    term1.open(document.getElementById('terminal1'));
-    const { master: m1, slave: s1 } = openpty();
-    term1.loadAddon(m1);
-
-    (async () => {
-      // let mnist_module = { pty: s1 };
-      // const _1 = await initEmscriptenMnist(mnist_module);
-      let ModuleArgBusyBox = { pty: s1 };
-      // ModuleArgBusyBox['SharedFS'] = mnist_module.FS;
-      // if (_1.FS != undefined) {
-      //   s1.write("in!!!!\n");
-      // } else {
-      //   s1.write("out!!!!\n");
-      // }
-      const module_busybox = await initEmscriptenBusyBox(ModuleArgBusyBox);
-    })();
-  </script>
-
-  <!-- mnist 用スクリプト -->
-  <script type="module">
-    import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
-    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.9.4/index.js';
-
     import initEmscriptenMnist from './mnist.js';
 
-    // Second terminal setup
-    const xterm2 = new Terminal();
-    xterm2.open(document.getElementById('terminal2'));
-    const { master: master2, slave: slave2 } = openpty();
-    xterm2.loadAddon(master2);
+    import './container2wasm-docs/arg-module.js'; // define Module
+    import initEmscriptenC2W from './container2wasm-docs/out.js';
 
     const runBtn = document.getElementById("runButton");
 
-    (async () => {
-      var Module = { pty: slave2 };
-      const inst = await initEmscriptenMnist(Module);
-      console.log('ffffff');
-      runBtn.addEventListener("click", () => {
-        Module['_callMain'](Module["arguments"]);
-      });
+    var ModuleMnist = {};
+
+    const busyboxPromise = (async () => {
+      const term1 = new Terminal();
+      term1.open(document.getElementById('terminal1'));
+      const { master: m1, slave: s1 } = openpty();
+      term1.loadAddon(m1);
+      await initEmscriptenBusyBox({ pty: s1 });
     })();
 
-  </script>
+    const mnistPromise = (async () => {
+      const xterm2 = new Terminal();
+      xterm2.open(document.getElementById('terminal2'));
+      const { master: master2, slave: slave2 } = openpty();
+      xterm2.loadAddon(master2);
+      ModuleMnist = { pty: slave2 };
+      await initEmscriptenMnist(ModuleMnist);
+    })();
 
-  <!-- Container2wasm 用スクリプト -->
-  <script src="./container2wasm-docs/load.js"></script>
-  <script type="module">
-    import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
-    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.9.4/index.js';
-    import './arg-module.js';
-    import initEmscriptenModule from './container2wasm-docs/out.js';
+    const c2wPromise = (async () => {
+      const term3 = new Terminal();
+      term3.open(document.getElementById('terminal3'));
+      const { master: m2, slave: s2 } = openpty();
+      term3.loadAddon(m2);
 
-    const term3 = new Terminal();
-    term3.open(document.getElementById('terminal3'));
-    const { master: m2, slave: s2 } = openpty();
-    term3.loadAddon(m2);
-
-    Module.pty = s2;
-    Module['mainScriptUrlOrBlob'] = location.origin + '/container2wasm-docs/out.js';
-    const info = 't:' + Math.floor(Date.now() / 1000) + '\n';
-    Module['preRun'].push(mod => {
-      mod.FS.mkdir('/pack');
-      mod.FS.writeFile('/pack/info', info);
-    });
-
-    const runBtn = document.getElementById("runButton");
-
-    (async () => {
-      const inst = await initEmscriptenModule(Module);
-      console.log("eeeee");
+      Module.pty = s2;
+      Module['mainScriptUrlOrBlob'] = location.origin + '/container2wasm-docs/out.js';
+      const info = 't:' + Math.floor(Date.now() / 1000) + '\n';
+      Module['preRun'].push(mod => {
+        mod.FS.mkdir('/pack');
+        mod.FS.writeFile('/pack/info', info);
+      });
+      const inst = await initEmscriptenC2W(Module);
       const old = Module.TTY.stream_ops.poll;
       Module.TTY.stream_ops.poll = (stream, timeout) => old.call(stream, 0);
-      runBtn.addEventListener("click", () => {
-        Module['clickRun'](Module["arguments"]);
-      });
     })();
+
+    Promise.all([mnistPromise, c2wPromise])
+      .then(() => {
+        runBtn.disabled = false;
+        runBtn.classList.add("enabled");
+        const msg = document.getElementById("button_status");
+        msg.textContent = "Initialization was done! ";
+        runBtn.addEventListener("click", () => {
+          msg.textContent = "Executing ... "
+          if (ModuleMnist.clickRun) {
+            ModuleMnist.clickRun(ModuleMnist.arguments);
+          } else {
+            ModuleMnist.pty.write("Error: ModuleMnist.clickRun is undefined.");
+          }
+          if (Module.clickRun) {
+            Module.clickRun(Module.arguments);
+          } else {
+            Module.pty.write("Error: Module.clickRun is undefined.");
+          }
+        });
+      })
+      .catch(err => {
+        console.error("error when initializing:", err);
+      });
   </script>
 </body>
 

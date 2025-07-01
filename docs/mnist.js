@@ -4006,7 +4006,7 @@ var ModuleMnist = (() => {
       postRun();
     }
 
-    Module["_callMain"] = callMain;
+    Module["clickRun"] = clickRun;
 
     // actually, only prepare runtime
     run();

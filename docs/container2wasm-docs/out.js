@@ -1311,9 +1311,6 @@ var Module = (() => {
           },
           read: (stream, buffer, offset, length) => {
             let readBytes = PTY.read(length);
-            console.log("readBytes[0]: %d", readBytes[0]);
-            console.log("length: %d", length);
-            console.log("offset: %d", offset);
             if (length && !readBytes.length) {
               PTY_askToWaitAgain(-1);
             }
@@ -7803,7 +7800,6 @@ var Module = (() => {
         });
         HEAPU32[((argv_ptr) >>> 2) >>> 0] = 0;
         try {
-          console.log("entry container.");
           var ret = entryFunction(argc, argv);
           exitJS(ret, /* implicit = */ true);
           return ret;
@@ -7835,8 +7831,6 @@ var Module = (() => {
           preMain();
           readyPromiseResolve(Module);
           if (Module["onRuntimeInitialized"]) Module["onRuntimeInitialized"]();
-          // if (shouldRunNow) callMain(args);
-          // postRun();
         }
         if (Module["setStatus"]) {
           Module["setStatus"]("Running...");
@@ -7863,16 +7857,11 @@ var Module = (() => {
         postRun();
       }
 
-      var shouldRunNow = true;
-
-      if (Module["noInitialRun"]) shouldRunNow = false;
-
       Module["clickRun"] = clickRun;
 
       // actually, only prepare runtime
       run();
-
-      return Module.ready;
+      return moduleArg.ready
     }
   );
 })();

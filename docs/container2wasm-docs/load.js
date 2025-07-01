@@ -19,7 +19,7 @@ Module.expectedDataFileDownloads++;
       PACKAGE_PATH = encodeURIComponent(location.pathname.toString().substring(0, location.pathname.toString().lastIndexOf('/')) + '/');
     }
     var PACKAGE_NAME = 'container2wasm-docs/qemu-system-aarch64.data';
-    var REMOTE_PACKAGE_BASE = ' container2wasm-docs/qemu-system-aarch64.data';
+    var REMOTE_PACKAGE_BASE = 'container2wasm-docs/qemu-system-aarch64.data';
     if (typeof Module['locateFilePackage'] === 'function' && !Module['locateFile']) {
       Module['locateFile'] = Module['locateFilePackage'];
       err('warning: you defined Module.locateFilePackage, that has been renamed to Module.locateFile (using your locateFilePackage for now)');
@@ -174,7 +174,7 @@ Module.expectedDataFileDownloads++;
     }
 
   }
-  loadPackage({ "files": [{ "filename": "/pack/bzImage", "start": 0, "end": 8202752 }, { "filename": "/pack/edk2-aarch64-code.fd", "start": 8202752, "end": 75311616 }, { "filename": "/pack/efi-virtio.rom", "start": 75311616, "end": 75472384 }, { "filename": "/pack/rootfs.bin", "start": 75472384, "end": 583937536 }, { "filename": "/pack/vm.state", "start": 583937536, "end": 674921065 }], "remote_package_size": 674921065 });
+  loadPackage({ "files": [{ "filename": "/pack/bzImage", "start": 0, "end": 8202752 }, { "filename": "/pack/edk2-aarch64-code.fd", "start": 8202752, "end": 75311616 }, { "filename": "/pack/efi-virtio.rom", "start": 75311616, "end": 75472384 }, { "filename": "/pack/rootfs.bin", "start": 75472384, "end": 158756352 }, { "filename": "/pack/vm.state", "start": 158756352, "end": 249727578 }], "remote_package_size": 249727578 });
 
 })();
 
