@@ -191,7 +191,10 @@
       term3.loadAddon(m2);
 
       Module.pty = s2;
-      Module['mainScriptUrlOrBlob'] = location.origin + '/elfconv-demo/container2wasm-docs/out.js';
+      const base = location.origin + location.pathname.replace(/\/$/, '');
+      // → "https://…github.io/elfconv-demo"
+      Module['mainScriptUrlOrBlob'] = base + '/container2wasm-docs/out.js';
+      // Module['mainScriptUrlOrBlob'] = location.origin + '/elfconv-demo/container2wasm-docs/out.js';
       const info = 't:' + Math.floor(Date.now() / 1000) + '\n';
       Module['preRun'].push(mod => {
         mod.FS.mkdir('/pack');
