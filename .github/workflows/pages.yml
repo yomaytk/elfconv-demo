@@ -1,0 +1,47 @@
+name: GitHub Pages (Jekyll + LFS)
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages:   write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with LFS)
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      - name: Setup Ruby & Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4.0'
+          bundler-cache: true
+
+      - name: Install Jekyll dependencies
+        run: |
+          cd docs
+          bundle install
+
+      - name: Build Jekyll site
+        run: |
+          cd docs
+          bundle exec jekyll build --destination ../_site
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
