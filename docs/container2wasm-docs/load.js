@@ -18,8 +18,8 @@ Module.expectedDataFileDownloads++;
       // web worker
       PACKAGE_PATH = encodeURIComponent(location.pathname.toString().substring(0, location.pathname.toString().lastIndexOf('/')) + '/');
     }
-    var PACKAGE_NAME = 'qemu-system-aarch64.data';
-    var REMOTE_PACKAGE_BASE = 'qemu-system-aarch64.data';
+    var PACKAGE_NAME = 'container2wasm-docs/qemu-system-aarch64.data';
+    var REMOTE_PACKAGE_BASE = 'container2wasm-docs/qemu-system-aarch64.data';
     if (typeof Module['locateFilePackage'] === 'function' && !Module['locateFile']) {
       Module['locateFile'] = Module['locateFilePackage'];
       err('warning: you defined Module.locateFilePackage, that has been renamed to Module.locateFile (using your locateFilePackage for now)');
