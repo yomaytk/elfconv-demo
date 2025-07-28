@@ -17,7 +17,7 @@
     }
 
     /* Wrapper for terminals: side-by-side */
-    .terminals-container {
+    .speed-comparison-terminals {
       display: flex;
       flex-direction: row;
       justify-content: center;
@@ -49,6 +49,30 @@
     .big-text {
       font-size: 1.2em;
       font-weight: bold;
+    }
+
+    .speed-comparison-terminals {
+      display: flex;
+      gap: 2rem;
+    }
+
+    .terminal-speed {
+      position: relative;
+      background: #222;
+      border-radius: 4px;
+      overflow: visible;
+    }
+
+    .caption-top::before {
+      content: attr(data-caption);
+      position: absolute;
+      top: -2em;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.9rem;
+      z-index: 10;
+      padding: 0.2em 0.4em;
+      text-decoration: underline;
     }
 
     #runButton:disabled {
@@ -131,8 +155,7 @@
     elfconv's Wasm?</h2>
   <p>Comparing the execution speed of the <a href="https://github.com/AndrewCarterUK/mnist-neural-network-plain-c">mnist
       neural network</a> Linux application on elfconv versus <a
-      href="https://github.com/container2wasm/container2wasm">container2wasm</a>. Left: elfconv;
-    Right: container2wasm.</p>
+      href="https://github.com/container2wasm/container2wasm">container2wasm</a>. </p>
 
   <!-- Run ボタン -->
   <div class="run_button">
@@ -140,11 +163,10 @@
   </div>
 
   <!-- Container for side-by-side terminals -->
-  <div class="terminals-container">
-    <!-- First terminal instance -->
-    <div id="terminal2" class="terminal"></div>
-    <!-- Second terminal instance -->
-    <div id="terminal3" class="terminal"></div>
+  <div class="speed-comparison-terminals">
+    <div id="mnist-container2wasm-terminal" class="terminal-speed caption-top" data-caption="Wasm on container2wasm">
+    </div>
+    <div id="mnist-elfconv-terminal" class="terminal-speed caption-top" data-caption="Wasm via elfconv"></div>
   </div>
 
   <footer style="margin:2em 0; color:#777; font-size:0.9em;">
@@ -177,7 +199,7 @@
 
     const mnistPromise = (async () => {
       const xterm2 = new Terminal();
-      xterm2.open(document.getElementById('terminal2'));
+      xterm2.open(document.getElementById('mnist-elfconv-terminal'));
       const { master: master2, slave: slave2 } = openpty();
       xterm2.loadAddon(master2);
       ModuleMnist = { pty: slave2 };
@@ -186,7 +208,7 @@
 
     const c2wPromise = (async () => {
       const term3 = new Terminal();
-      term3.open(document.getElementById('terminal3'));
+      term3.open(document.getElementById('mnist-container2wasm-terminal'));
       const { master: m2, slave: s2 } = openpty();
       term3.loadAddon(m2);
 
