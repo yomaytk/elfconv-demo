@@ -99,25 +99,9 @@
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
-    .notes {
-      width: 100%;
-      margin: 2em 0;
-    }
-
-    .notes-title {
-      text-align: center;
-      margin-bottom: 0.5em;
-    }
-
-    .notes-body {
-      max-width: 900px;
-      margin: 0 auto;
-      line-height: 1.6;
-      color: #333;
-    }
-
-    .notes-body p {
-      margin: 0.6em 0;
+    .centered-section {
+      margin-left: 15%;
+      margin-right: 15%;
     }
   </style>
 </head>
@@ -135,15 +119,17 @@
       (GNU Bash + BusyBox)</h2>
   </header>
 
-  <section>
-    <p><strong>Notes:</strong></p>
+  <section class="centered-section">
+    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
     <div>
       <p>
         This is a demonstration of running WebAssembly (Wasm) versions of statically linked Linux/aarch64
-        applications—<strong>GNU
-          Bash</strong> and <strong>BusyBox</strong>.
+        applications—<strong>GNU Bash</strong> and <strong>BusyBox</strong>. The symlinks under <span
+          class="cmd">/usr/bin</span> are verified to work at least.
       </p>
-      <p>The symlinks under <span class="cmd">/usr/bin</span> are verified to work at least.</p>
+      <strong style="color: #d32f2f;">⚠️ Caution:</strong> Many BusyBox commands are untested. As a result, they may
+      frequently terminate
+      abnormally with runtime errors. If this happens, please reload the page.</p>
     </div>
   </section>
 
