@@ -223,7 +223,7 @@
         runBtn.disabled = false;
         runBtn.classList.add("enabled");
         const msg = document.getElementById("button_status");
-        msg.textContent = "Initialization was done! ";
+        msg.textContent = "";
         runBtn.addEventListener("click", () => {
           msg.textContent = "Executing ... "
           if (ModuleMnist.clickRun) {
