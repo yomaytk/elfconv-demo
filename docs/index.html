@@ -98,52 +98,53 @@
       background-color: #20c043;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
+
+    .notes {
+      width: 100%;
+      margin: 2em 0;
+    }
+
+    .notes-title {
+      text-align: center;
+      margin-bottom: 0.5em;
+    }
+
+    .notes-body {
+      max-width: 900px;
+      margin: 0 auto;
+      line-height: 1.6;
+      color: #333;
+    }
+
+    .notes-body p {
+      margin: 0.6em 0;
+    }
   </style>
 </head>
 
 <body>
   <header style="text-align:center; margin-bottom:1em;">
-    <h1>elfconv WebAssembly Demo</h1>
+    <h1>elfconv Demo</h1>
     <p>
       <span class="big-text">This is the demo page for <a href="https://github.com/yomaytk/elfconv" target="_blank"
-          class="big-text"><strong>elfconv</strong></a>, which runs WebAssembly converted from Linux
+          class="big-text"><strong>elfconv</strong></a> which runs WebAssembly converted from Linux
         applications.
     </p>
     <hr style="border:0; height:1px; background:#ccc; width:98%; margin:2em auto;" />
-    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">BusyBox Shell
-      Environment</h2>
+    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">Shell Environment
+      (GNU Bash + BusyBox)</h2>
   </header>
 
-  <p style="text-align: center;">
-    The following commands have been verified to work:
-    <br><br>
-    <span>
-      <span class="cmd">arch</span>,
-      <span class="cmd">ascii</span>,
-      <span class="cmd">basename</span>,
-      <span class="cmd">busybox</span>,
-      <span class="cmd">cd</span>,
-      <span class="cmd">clear</span>,
-      <span class="cmd">date</span>,
-      <span class="cmd">echo</span>,
-      <span class="cmd">hostname</span>,
-      <span class="cmd">ls</span>,
-      <span class="cmd">mkdir</span>,
-      <span class="cmd">pwd</span>,
-      <span class="cmd">rm</span>,
-      <span class="cmd">rmdir</span>,
-      <span class="cmd">tree</span>,
-      <span class="cmd">uname</span>
-    </span>
-  </p>
   <section>
     <p><strong>Notes:</strong></p>
-    <ul style="list-style-type:none; padding:0; line-height:1.4;">
-      <li>• The original BusyBox source code (version: 1_36_stable) has been patched with code that adds a shell
-        environment. Please refer <a href="https://github.com/yomaytk/elfconv/tree/main/examples#busybox">this</a> for
-        detail.
-      </li>
-    </ul>
+    <div>
+      <p>
+        This is a demonstration of running WebAssembly (Wasm) versions of statically linked Linux/aarch64
+        applications—<strong>GNU
+          Bash</strong> and <strong>BusyBox</strong>.
+      </p>
+      <p>The symlinks under <span class="cmd">/usr/bin</span> are verified to work at least.</p>
+    </div>
   </section>
 
   <!-- BusyBox Terminal -->
@@ -157,7 +158,7 @@
       neural network</a> Linux application on elfconv versus <a
       href="https://github.com/container2wasm/container2wasm">container2wasm</a>. </p>
 
-  <!-- Run ボタン -->
+  <!-- Run button -->
   <div class="run_button">
     <span id="button_status">Please wait for initializing ... </span><button id="runButton">Run</button>
   </div>
@@ -177,10 +178,10 @@
   <script src="./container2wasm-docs/load.js"></script>
   <script type="module">
     import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
-    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.9.4/index.js';
+    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.10.1/index.js';
 
-    import initEmscriptenBusyBox from './exe.js';
-    import initEmscriptenMnist from './mnist.js';
+    import moduleBash from './js-kernel.js';
+    import moduleMnist from './mnist.js';
 
     import './container2wasm-docs/arg-module.js'; // define Module
     import initEmscriptenC2W from './container2wasm-docs/out.js';
@@ -194,7 +195,11 @@
       term1.open(document.getElementById('terminal1'));
       const { master: m1, slave: s1 } = openpty();
       term1.loadAddon(m1);
-      await initEmscriptenBusyBox({ pty: s1 });
+      await moduleBash({
+        pty: s1,
+        initProgram: 'bash-static.wasm',
+        executables: ["bash-static", "busybox"],
+      });
     })();
 
     const mnistPromise = (async () => {
@@ -203,7 +208,7 @@
       const { master: master2, slave: slave2 } = openpty();
       xterm2.loadAddon(master2);
       ModuleMnist = { pty: slave2 };
-      await initEmscriptenMnist(ModuleMnist);
+      await moduleMnist(ModuleMnist);
     })();
 
     const c2wPromise = (async () => {
