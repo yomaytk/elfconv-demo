@@ -193,7 +193,7 @@
       term3.loadAddon(m2);
 
       Module.pty = s2;
-      const base = location.origin + location.pathname.replace(/\/$/, '');
+      const base = location.origin + location.pathname.replace(/\/[^/]*$/, '');
       Module['mainScriptUrlOrBlob'] = base + '/container2wasm-docs/out.js';
       const info = 't:' + Math.floor(Date.now() / 1000) + '\n';
       Module['preRun'].push(mod => {
