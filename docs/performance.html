@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>ELFCONV Demo - Performance Comparison</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.17.0/css/xterm.css" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+
+    .speed-comparison-terminals {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1600px;
+      margin: 2em 0;
+      box-sizing: border-box;
+      padding: 0 1em;
+    }
+
+    .terminal-speed {
+      position: relative;
+      background: #222;
+      border-radius: 4px;
+      overflow: visible;
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .caption-top::before {
+      content: attr(data-caption);
+      position: absolute;
+      top: -2em;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.9rem;
+      z-index: 10;
+      padding: 0.2em 0.4em;
+      text-decoration: underline;
+    }
+
+    .run_button {
+      width: 100%;
+      text-align: center;
+      margin: 2em 0;
+    }
+
+    #runButton {
+      padding: 0.75em 2em;
+      font-size: 1em;
+      border-radius: 4px;
+      border: 1px solid #bbb;
+      cursor: pointer;
+    }
+
+    #runButton:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      background-color: #ccc;
+      color: #666;
+    }
+
+    #runButton.enabled {
+      opacity: 1;
+      cursor: pointer;
+      background-color: #98f798;
+      color: #000;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s, box-shadow 0.3s;
+    }
+
+    #runButton.enabled:hover {
+      background-color: #20c043;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .centered-section {
+      max-width: 1200px;
+      width: 100%;
+      padding: 0 2em;
+      box-sizing: border-box;
+    }
+
+    .back-link {
+      width: 100%;
+      max-width: 1600px;
+      padding: 1em 2em;
+      box-sizing: border-box;
+    }
+
+    .back-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+
+    header {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 1em;
+    }
+
+    footer {
+      width: 100%;
+      margin: 2em 0;
+      text-align: center;
+      color: #777;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="back-link">
+    <a href="index.html">← Back to Home</a>
+  </div>
+
+  <header style="text-align:center; margin-bottom:1em;">
+    <h1>elfconv Demo</h1>
+    <hr style="border:0; height:1px; background:#ccc; width:98%; margin:2em auto;" />
+    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">How fast is
+      elfconv's Wasm?</h2>
+  </header>
+
+  <section class="centered-section">
+    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
+    <div>
+      <p>
+        This is a performance comparison of the <a href="https://github.com/AndrewCarterUK/mnist-neural-network-plain-c">MNIST
+        neural network</a> Linux application running on elfconv versus <a
+        href="https://github.com/container2wasm/container2wasm">container2wasm</a>.
+        Click the "Run" button below to see the execution speed difference between the two approaches.
+      </p>
+    </div>
+  </section>
+
+  <!-- Run button -->
+  <div class="run_button">
+    <span id="button_status">Please wait for initializing ... </span><button id="runButton">Run</button>
+  </div>
+
+  <!-- Container for side-by-side terminals -->
+  <div class="speed-comparison-terminals">
+    <div id="mnist-container2wasm-terminal" class="terminal-speed caption-top" data-caption="Wasm on container2wasm">
+    </div>
+    <div id="mnist-elfconv-terminal" class="terminal-speed caption-top" data-caption="Wasm via elfconv"></div>
+  </div>
+
+  <footer style="margin:2em 0; color:#777; font-size:0.9em;">
+    <a href="index.html">Back to Home</a>
+  </footer>
+
+  <script src="coi-serviceworker.js"></script>
+  <script src="./container2wasm-docs/load.js"></script>
+  <script type="module">
+    import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
+    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.10.1/index.js';
+
+    import moduleMnist from './mnist.js';
+
+    import './container2wasm-docs/arg-module.js'; // define Module
+    import initEmscriptenC2W from './container2wasm-docs/out.js';
+
+    const runBtn = document.getElementById("runButton");
+
+    var ModuleMnist = {};
+
+    const mnistPromise = (async () => {
+      const xterm2 = new Terminal();
+      xterm2.open(document.getElementById('mnist-elfconv-terminal'));
+      const { master: master2, slave: slave2 } = openpty();
+      xterm2.loadAddon(master2);
+      ModuleMnist = { pty: slave2 };
+      await moduleMnist(ModuleMnist);
+    })();
+
+    const c2wPromise = (async () => {
+      const term3 = new Terminal();
+      term3.open(document.getElementById('mnist-container2wasm-terminal'));
+      const { master: m2, slave: s2 } = openpty();
+      term3.loadAddon(m2);
+
+      Module.pty = s2;
+      const base = location.origin + location.pathname.replace(/\/$/, '');
+      Module['mainScriptUrlOrBlob'] = base + '/container2wasm-docs/out.js';
+      const info = 't:' + Math.floor(Date.now() / 1000) + '\n';
+      Module['preRun'].push(mod => {
+        mod.FS.mkdir('/pack');
+        mod.FS.writeFile('/pack/info', info);
+      });
+      const inst = await initEmscriptenC2W(Module);
+      const old = Module.TTY.stream_ops.poll;
+      Module.TTY.stream_ops.poll = (stream, timeout) => old.call(stream, 0);
+    })();
+
+    Promise.all([mnistPromise, c2wPromise])
+      .then(() => {
+        runBtn.disabled = false;
+        runBtn.classList.add("enabled");
+        const msg = document.getElementById("button_status");
+        msg.textContent = "";
+        runBtn.addEventListener("click", () => {
+          msg.textContent = "Executing ... "
+          if (ModuleMnist.clickRun) {
+            ModuleMnist.clickRun(ModuleMnist.arguments);
+          } else {
+            ModuleMnist.pty.write("Error: ModuleMnist.clickRun is undefined.");
+          }
+          if (Module.clickRun) {
+            Module.clickRun(Module.arguments);
+          } else {
+            Module.pty.write("Error: Module.clickRun is undefined.");
+          }
+        });
+      })
+      .catch(err => {
+        console.error("error when initializing:", err);
+      });
+  </script>
+</body>
+
+</html>

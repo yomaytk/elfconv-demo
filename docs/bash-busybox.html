@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>ELFCONV Demo - Bash + BusyBox</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.17.0/css/xterm.css" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+
+    .cmd {
+      background-color: #f0f0f0;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 1200px;
+      margin: 2em 0;
+    }
+
+    .centered-section {
+      max-width: 1200px;
+      width: 100%;
+      padding: 0 2em;
+      box-sizing: border-box;
+    }
+
+    .back-link {
+      width: 100%;
+      max-width: 1200px;
+      padding: 1em 2em;
+      box-sizing: border-box;
+    }
+
+    .back-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+
+    header {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 1em;
+    }
+
+    footer {
+      width: 100%;
+      margin: 2em 0;
+      text-align: center;
+      color: #777;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="back-link">
+    <a href="index.html">← Back to Home</a>
+  </div>
+
+  <header style="text-align:center; margin-bottom:1em;">
+    <h1>elfconv Demo</h1>
+    <hr style="border:0; height:1px; background:#ccc; width:98%; margin:2em auto;" />
+    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">Shell Environment
+      (GNU Bash + BusyBox)</h2>
+  </header>
+
+  <section class="centered-section">
+    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
+    <div>
+      <p>
+        This is a demonstration of running WebAssembly versions of statically linked Linux/aarch64
+        applications—<strong>GNU Bash</strong> and <strong>BusyBox</strong>.
+        You can use Bash as an interactive shell and execute various BusyBox utilities via symlinks under <span
+          class="cmd">/usr/bin</span>.
+      </p>
+      <p>
+        <strong style="color: #d32f2f;">⚠️ Caution:</strong> Many BusyBox commands are untested.
+        As a result, they may occasionally terminate with runtime errors. If this happens, please reload the page.
+      </p>
+    </div>
+  </section>
+
+  <!-- Bash + BusyBox Terminal -->
+  <div id="terminal1" class="terminal"></div>
+
+  <footer style="margin:2em 0; color:#777; font-size:0.9em;">
+    <a href="index.html">Back to Home</a>
+  </footer>
+
+  <script src="coi-serviceworker.js"></script>
+  <script type="module">
+    import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
+    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.10.1/index.js';
+
+    import moduleBash from './js-kernel.js';
+
+    // Terminal: Bash + BusyBox only
+    const busyboxPromise = (async () => {
+      const term1 = new Terminal();
+      term1.open(document.getElementById('terminal1'));
+      const { master: m1, slave: s1 } = openpty();
+      term1.loadAddon(m1);
+      await moduleBash({
+        pty: s1,
+        initProgram: 'bash-static.wasm',
+        executables: ["bash-static", "busybox"],
+      });
+    })();
+  </script>
+</body>
+
+</html>

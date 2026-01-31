@@ -4,294 +4,102 @@
 <head>
   <meta charset="UTF-8" />
   <title>ELFCONV Demo</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.17.0/css/xterm.css" />
   <style>
-    /* Body flex to center terminals */
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       margin: 0;
-      padding: 0;
+      padding: 2em;
       font-family: sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
     }
 
-    /* Wrapper for terminals: side-by-side */
-    .speed-comparison-terminals {
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      gap: 1em;
-      width: 100%;
-      max-width: 1600px;
-      box-sizing: border-box;
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .intro {
+      text-align: center;
+      margin-bottom: 2em;
+      line-height: 1.6;
+    }
+
+    .demo-list {
+      list-style: none;
+      padding: 0;
+      margin: 2em 0;
+    }
+
+    .demo-list li {
+      margin: 1.5em 0;
       padding: 1em;
+      border-left: 4px solid #007bff;
+      background-color: #f8f9fa;
     }
 
-    /* Style for individual command tokens */
-    .cmd {
-      background-color: #f0f0f0;
-      padding: 2px 4px;
-      border-radius: 3px;
-      font-family: Menlo, Consolas, monospace;
-      font-size: 0.9em;
+    .demo-list h2 {
+      margin-top: 0;
+      font-size: 1.3em;
+      color: #007bff;
     }
 
-    /* Terminal containers: flexible width */
-    .terminal {
-      flex: 1;
-      min-width: 300px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      overflow: hidden;
+    .demo-list p {
+      margin: 0.5em 0;
+      color: #555;
     }
 
-    .big-text {
-      font-size: 1.2em;
+    .demo-list a {
+      color: #007bff;
+      text-decoration: none;
       font-weight: bold;
     }
 
-    .speed-comparison-terminals {
-      display: flex;
-      gap: 2rem;
-    }
-
-    .terminal-speed {
-      position: relative;
-      background: #222;
-      border-radius: 4px;
-      overflow: visible;
-    }
-
-    .caption-top::before {
-      content: attr(data-caption);
-      position: absolute;
-      top: -2em;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 0.9rem;
-      z-index: 10;
-      padding: 0.2em 0.4em;
+    .demo-list a:hover {
       text-decoration: underline;
     }
 
-    #runButton:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-      background-color: #ccc;
-      color: #f3f1f1;
-      border: 1px solid #bbb;
-      transition: none;
-      pointer-events: none;
-    }
-
-    #runButton.enabled {
-      opacity: 1;
-      cursor: pointer;
-      background-color: #98f798;
-      color: rgb(3, 4, 3);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-      transition: background-color 0.3s, box-shadow 0.3s;
-    }
-
-    #runButton.enabled:hover {
-      background-color: #20c043;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    .centered-section {
-      margin-left: 15%;
-      margin-right: 15%;
+    footer {
+      margin-top: 3em;
+      text-align: center;
+      color: #777;
+      font-size: 0.9em;
     }
   </style>
 </head>
 
 <body>
-  <header style="text-align:center; margin-bottom:1em;">
-    <h1>elfconv Demo</h1>
+  <h1>elfconv Demo</h1>
+
+  <div class="intro">
     <p>
-      <span class="big-text">This is the demo page for <a href="https://github.com/yomaytk/elfconv" target="_blank"
-          class="big-text"><strong>elfconv</strong></a> which runs WebAssembly converted from Linux
-        applications.
+      This is the demo page for <a href="https://github.com/yomaytk/elfconv" target="_blank"><strong>elfconv</strong></a>,
+      which runs WebAssembly converted from Linux applications.
     </p>
-    <hr style="border:0; height:1px; background:#ccc; width:98%; margin:2em auto;" />
-    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">Shell Environment
-      (GNU Bash + BusyBox)</h2>
-  </header>
-
-  <section class="centered-section">
-    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
-    <div>
-      <p>
-        This is a demonstration of running WebAssembly versions of statically linked Linux/aarch64
-        applications—<strong>GNU Bash</strong> and <strong>BusyBox</strong>.
-        You can use Bash as an interactive shell and execute various BusyBox utilities via symlinks under <span
-          class="cmd">/usr/bin</span>.
-      </p>
-      <p>
-        <strong style="color: #d32f2f;">⚠️ Caution:</strong> Many BusyBox commands are untested.
-        As a result, they may occasionally terminate with runtime errors. If this happens, please reload the page.
-      </p>
-    </div>
-  </section>
-
-  <!-- Bash + BusyBox Terminal -->
-  <div id="terminal1" class="terminal"></div>
-
-  <hr style="border:0; height:1px; background:#ccc; width:70%; margin:2em auto;" />
-
-  <section style="text-align:center; margin-top:2em;">
-    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">Python
-      Environment</h2>
-  </section>
-
-  <section class="centered-section">
-    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
-    <div>
-      <p>
-        This is a demonstration of <strong>CPython</strong> ported to WebAssembly and running directly in your browser.
-        You can run Python scripts and use the interactive interpreter.
-        Try running <span class="cmd">python --version</span> or <span class="cmd">python -c "import sys;
-          print(sys.version)"</span>
-        to see the Python environment in action!
-      </p>
-    </div>
-  </section>
-
-  <!-- Bash + BusyBox + Python Terminal -->
-  <div id="terminal2" class="terminal"></div>
-
-  <hr style="border:0; height:1px; background:#ccc; width:70%; margin:2em auto;" />
-
-  <section style="text-align:center; margin-top:2em;">
-    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">How fast is
-      elfconv's Wasm?</h2>
-  </section>
-
-  <section class="centered-section">
-    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
-    <div>
-      <p>
-        This is a performance comparison of the <a href="https://github.com/AndrewCarterUK/mnist-neural-network-plain-c">MNIST
-        neural network</a> Linux application running on elfconv versus <a
-        href="https://github.com/container2wasm/container2wasm">container2wasm</a>.
-        Click the "Run" button below to see the execution speed difference between the two approaches.
-      </p>
-    </div>
-  </section>
-
-  <!-- Run button -->
-  <div class="run_button">
-    <span id="button_status">Please wait for initializing ... </span><button id="runButton">Run</button>
   </div>
 
-  <!-- Container for side-by-side terminals -->
-  <div class="speed-comparison-terminals">
-    <div id="mnist-container2wasm-terminal" class="terminal-speed caption-top" data-caption="Wasm on container2wasm">
-    </div>
-    <div id="mnist-elfconv-terminal" class="terminal-speed caption-top" data-caption="Wasm via elfconv"></div>
-  </div>
+  <ul class="demo-list">
+    <li>
+      <h2>Shell Environment (GNU Bash + BusyBox)</h2>
+      <p>GNU Bash and BusyBox running as WebAssembly in your browser.</p>
+      <a href="bash-busybox.html">Try it →</a>
+    </li>
 
-  <footer style="margin:2em 0; color:#777; font-size:0.9em;">
-    More to come…
+    <li>
+      <h2>Python Environment</h2>
+      <p>CPython ported to WebAssembly running directly in your browser.</p>
+      <a href="python.html">Try it →</a>
+    </li>
+
+    <li>
+      <h2>Performance Comparison</h2>
+      <p>Compare elfconv's WebAssembly performance against container2wasm using MNIST benchmark.</p>
+      <a href="performance.html">View it →</a>
+    </li>
+  </ul>
+
+  <footer>
+    More demos coming soon…
   </footer>
-
-  <script src="coi-serviceworker.js"></script>
-  <script src="./container2wasm-docs/load.js"></script>
-  <script type="module">
-    import 'https://cdn.jsdelivr.net/npm/xterm@4.17.0/lib/xterm.min.js';
-    import 'https://cdn.jsdelivr.net/npm/xterm-pty@0.10.1/index.js';
-
-    import moduleBash from './js-kernel.js';
-    import moduleMnist from './mnist.js';
-
-    import './container2wasm-docs/arg-module.js'; // define Module
-    import initEmscriptenC2W from './container2wasm-docs/out.js';
-
-    const runBtn = document.getElementById("runButton");
-
-    var ModuleMnist = {};
-
-    // Terminal 1: Bash + BusyBox only
-    const busyboxPromise = (async () => {
-      const term1 = new Terminal();
-      term1.open(document.getElementById('terminal1'));
-      const { master: m1, slave: s1 } = openpty();
-      term1.loadAddon(m1);
-      await moduleBash({
-        pty: s1,
-        initProgram: 'bash-static.wasm',
-        executables: ["bash-static", "busybox"],
-      });
-    })();
-
-    // Terminal 2: Bash + BusyBox + Python
-    const pythonTerminalPromise = (async () => {
-      const term2 = new Terminal();
-      term2.open(document.getElementById('terminal2'));
-      const { master: m2, slave: s2 } = openpty();
-      term2.loadAddon(m2);
-      await moduleBash({
-        pty: s2,
-        initProgram: 'bash-static.wasm',
-        executables: ["bash-static", "busybox", "python"],
-      });
-    })();
-
-    const mnistPromise = (async () => {
-      const xterm2 = new Terminal();
-      xterm2.open(document.getElementById('mnist-elfconv-terminal'));
-      const { master: master2, slave: slave2 } = openpty();
-      xterm2.loadAddon(master2);
-      ModuleMnist = { pty: slave2 };
-      await moduleMnist(ModuleMnist);
-    })();
-
-    const c2wPromise = (async () => {
-      const term3 = new Terminal();
-      term3.open(document.getElementById('mnist-container2wasm-terminal'));
-      const { master: m2, slave: s2 } = openpty();
-      term3.loadAddon(m2);
-
-      Module.pty = s2;
-      const base = location.origin + location.pathname.replace(/\/$/, '');
-      // → "https://…github.io/elfconv-demo"
-      Module['mainScriptUrlOrBlob'] = base + '/container2wasm-docs/out.js';
-      // Module['mainScriptUrlOrBlob'] = location.origin + '/elfconv-demo/container2wasm-docs/out.js';
-      const info = 't:' + Math.floor(Date.now() / 1000) + '\n';
-      Module['preRun'].push(mod => {
-        mod.FS.mkdir('/pack');
-        mod.FS.writeFile('/pack/info', info);
-      });
-      const inst = await initEmscriptenC2W(Module);
-      const old = Module.TTY.stream_ops.poll;
-      Module.TTY.stream_ops.poll = (stream, timeout) => old.call(stream, 0);
-    })();
-
-    Promise.all([mnistPromise, c2wPromise])
-      .then(() => {
-        runBtn.disabled = false;
-        runBtn.classList.add("enabled");
-        const msg = document.getElementById("button_status");
-        msg.textContent = "";
-        runBtn.addEventListener("click", () => {
-          msg.textContent = "Executing ... "
-          if (ModuleMnist.clickRun) {
-            ModuleMnist.clickRun(ModuleMnist.arguments);
-          } else {
-            ModuleMnist.pty.write("Error: ModuleMnist.clickRun is undefined.");
-          }
-          if (Module.clickRun) {
-            Module.clickRun(Module.arguments);
-          } else {
-            Module.pty.write("Error: Module.clickRun is undefined.");
-          }
-        });
-      })
-      .catch(err => {
-        console.error("error when initializing:", err);
-      });
-  </script>
 </body>
 
 </html>
