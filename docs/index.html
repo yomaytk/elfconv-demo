@@ -123,26 +123,62 @@
     <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
     <div>
       <p>
-        This is a demonstration of running WebAssembly (Wasm) versions of statically linked Linux/aarch64
-        applications—<strong>GNU Bash</strong> and <strong>BusyBox</strong>. The symlinks under <span
-          class="cmd">/usr/bin</span> have been
-        verified to work.
+        This is a demonstration of running WebAssembly versions of statically linked Linux/aarch64
+        applications—<strong>GNU Bash</strong> and <strong>BusyBox</strong>.
+        You can use Bash as an interactive shell and execute various BusyBox utilities via symlinks under <span
+          class="cmd">/usr/bin</span>.
       </p>
-      <strong style="color: #d32f2f;">⚠️ Caution:</strong> Many BusyBox commands are untested. As a result, they may
-      frequently terminate with runtime errors. If this happens, please reload the page.</p>
+      <p>
+        <strong style="color: #d32f2f;">⚠️ Caution:</strong> Many BusyBox commands are untested.
+        As a result, they may occasionally terminate with runtime errors. If this happens, please reload the page.
+      </p>
     </div>
   </section>
 
-  <!-- BusyBox Terminal -->
+  <!-- Bash + BusyBox Terminal -->
   <div id="terminal1" class="terminal"></div>
 
   <hr style="border:0; height:1px; background:#ccc; width:70%; margin:2em auto;" />
 
-  <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">How fast is
-    elfconv's Wasm?</h2>
-  <p>Comparing the execution speed of the <a href="https://github.com/AndrewCarterUK/mnist-neural-network-plain-c">mnist
-      neural network</a> Linux application on elfconv versus <a
-      href="https://github.com/container2wasm/container2wasm">container2wasm</a>. </p>
+  <section style="text-align:center; margin-top:2em;">
+    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">Python
+      Environment</h2>
+  </section>
+
+  <section class="centered-section">
+    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
+    <div>
+      <p>
+        This is a demonstration of <strong>CPython</strong> ported to WebAssembly and running directly in your browser.
+        You can run Python scripts and use the interactive interpreter.
+        Try running <span class="cmd">python --version</span> or <span class="cmd">python -c "import sys;
+          print(sys.version)"</span>
+        to see the Python environment in action!
+      </p>
+    </div>
+  </section>
+
+  <!-- Bash + BusyBox + Python Terminal -->
+  <div id="terminal2" class="terminal"></div>
+
+  <hr style="border:0; height:1px; background:#ccc; width:70%; margin:2em auto;" />
+
+  <section style="text-align:center; margin-top:2em;">
+    <h2 style="font-size:1.5em; font-weight:normal; color:#007bff; margin-top:0; margin-bottom:0.5em;">How fast is
+      elfconv's Wasm?</h2>
+  </section>
+
+  <section class="centered-section">
+    <h3 style="margin: 0 0 8px; font-size: 1.25em;">Overview</h3>
+    <div>
+      <p>
+        This is a performance comparison of the <a href="https://github.com/AndrewCarterUK/mnist-neural-network-plain-c">MNIST
+        neural network</a> Linux application running on elfconv versus <a
+        href="https://github.com/container2wasm/container2wasm">container2wasm</a>.
+        Click the "Run" button below to see the execution speed difference between the two approaches.
+      </p>
+    </div>
+  </section>
 
   <!-- Run button -->
   <div class="run_button">
@@ -176,6 +212,7 @@
 
     var ModuleMnist = {};
 
+    // Terminal 1: Bash + BusyBox only
     const busyboxPromise = (async () => {
       const term1 = new Terminal();
       term1.open(document.getElementById('terminal1'));
@@ -185,6 +222,19 @@
         pty: s1,
         initProgram: 'bash-static.wasm',
         executables: ["bash-static", "busybox"],
+      });
+    })();
+
+    // Terminal 2: Bash + BusyBox + Python
+    const pythonTerminalPromise = (async () => {
+      const term2 = new Terminal();
+      term2.open(document.getElementById('terminal2'));
+      const { master: m2, slave: s2 } = openpty();
+      term2.loadAddon(m2);
+      await moduleBash({
+        pty: s2,
+        initProgram: 'bash-static.wasm',
+        executables: ["bash-static", "busybox", "python"],
       });
     })();
 
