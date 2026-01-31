@@ -34,8 +34,8 @@ var Module = (() => {
     var FIFO_AtomicBuf;
 
     // edited by *.generated.js
-    var meForkedP = 5030176;
-    var meExecvedP = 5030180;
+    var meForkedP = 5030032;
+    var meExecvedP = 5030036;
 
     // Linux macro
     const __FD_SETSIZE = 1024;
