@@ -1794,8 +1794,10 @@ var Module = (() => {
       }
     };
 
-    // Add FS.createPath function for loadPackage compatibility
-    var FS_createPath = (parent, path, canRead, canWrite) => {
+    // Expose helpers for loadPackage
+    Module["addRunDependency"] = addRunDependency;
+    Module["removeRunDependency"] = removeRunDependency;
+    Module["FS_createPath"] = (parent, path, canRead, canWrite) => {
       var fullPath = parent === "/" ? "/" + path : parent + "/" + path;
       var parts = fullPath.split("/").filter(p => p);
       var currentPath = "";
@@ -1804,19 +1806,10 @@ var Module = (() => {
         try {
           FS.mkdir(currentPath);
         } catch (e) {
-          // Ignore error if directory already exists
           if (e.errno !== 20) throw e;
         }
       }
     };
-
-    // Expose addRunDependency and removeRunDependency for loadPackage
-    Module["addRunDependency"] = addRunDependency;
-    Module["removeRunDependency"] = removeRunDependency;
-    Module["FS_createPath"] = FS_createPath;
-
-    // Create a special version of FS_createDataFile that doesn't require FD table
-    // This is needed for loadPackage which runs before process initialization
     Module["FS_createDataFile"] = (parent, name, data, canRead, canWrite, canOwn) => {
       var path = name;
       if (parent) {
@@ -1824,6 +1817,13 @@ var Module = (() => {
         path = name ? PATH.join2(parent, name) : parent
       }
       var mode = FS_getMode(canRead, canWrite);
+      // Remove existing node if present (overwrite preloaded files)
+      try {
+        var existing = FS.lookupPath(path);
+        if (existing && existing.node) {
+          FS.unlink(path);
+        }
+      } catch (e) { /* node doesn't exist, fine */ }
       var node = FS.create(path, mode);
       if (data) {
         if (typeof data == "string") {
@@ -1831,14 +1831,11 @@ var Module = (() => {
           for (var i = 0, len = data.length; i < len; ++i) arr[i] = data.charCodeAt(i);
           data = arr
         }
-        // For MEMFS, directly set the contents without opening a stream
         if (node.node_ops && node.node_ops.setattr) {
-          // Set contents directly on MEMFS node
           node.contents = new Uint8Array(data);
           node.usedBytes = data.length;
           node.timestamp = Date.now();
         } else {
-          // Fallback: use the standard method (may fail if FD table not initialized)
           FS.chmod(node, mode | 146);
           var stream = FS.open(node, 577);
           FS.write(stream, data, 0, data.length, 0, canOwn);
@@ -1848,19 +1845,11 @@ var Module = (() => {
       }
     };
 
-    // Define loadPackage function (will be called from run())
+    // loadPackage: fetch a .data file and extract preloaded files
     Module["expectedDataFileDownloads"] ??= 0;
     Module["loadPackage"] = function (metadata) {
-      console.log("loadPackage called, Module.FS_createDataFile exists:", typeof Module["FS_createDataFile"]);
-      console.log("FS exists:", typeof FS, "FS.createDataFile exists:", typeof FS?.createDataFile);
-      var PACKAGE_PATH = "";
-      if (typeof window === "object") {
-        PACKAGE_PATH = window["encodeURIComponent"](window.location.pathname.substring(0, window.location.pathname.lastIndexOf("/")) + "/")
-      } else if (typeof process === "undefined" && typeof location !== "undefined") {
-        PACKAGE_PATH = encodeURIComponent(location.pathname.substring(0, location.pathname.lastIndexOf("/")) + "/")
-      }
-      var PACKAGE_NAME = "python.data";
-      var REMOTE_PACKAGE_BASE = "python.data";
+      var PACKAGE_NAME = metadata["packageDataName"];
+      var REMOTE_PACKAGE_BASE = PACKAGE_NAME;
       var REMOTE_PACKAGE_NAME = Module["locateFile"] ? Module["locateFile"](REMOTE_PACKAGE_BASE, "") : REMOTE_PACKAGE_BASE;
       var REMOTE_PACKAGE_SIZE = metadata["remote_package_size"];
 
@@ -1930,7 +1919,6 @@ var Module = (() => {
 
       var runWithFSExecuted = false;
       function runWithFS(Module) {
-        // Ensure runWithFS is executed only once
         if (runWithFSExecuted) {
           return;
         }
@@ -1939,250 +1927,6 @@ var Module = (() => {
         function assert(check, msg) {
           if (!check) throw msg + (new Error).stack
         }
-        Module["FS_createPath"]("/lib", "python3.15", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "lib-dynload", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "__phello__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/__phello__", "ham", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "_pyrepl", true, true);
-        Module["FS_createPath"]("/lib/python3.15/_pyrepl", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "asyncio", true, true);
-        Module["FS_createPath"]("/lib/python3.15/asyncio", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "collections", true, true);
-        Module["FS_createPath"]("/lib/python3.15/collections", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "compression", true, true);
-        Module["FS_createPath"]("/lib/python3.15/compression", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/compression", "_common", true, true);
-        Module["FS_createPath"]("/lib/python3.15/compression/_common", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/compression", "zstd", true, true);
-        Module["FS_createPath"]("/lib/python3.15/compression/zstd", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "concurrent", true, true);
-        Module["FS_createPath"]("/lib/python3.15/concurrent", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/concurrent", "futures", true, true);
-        Module["FS_createPath"]("/lib/python3.15/concurrent/futures", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/concurrent", "interpreters", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "ctypes", true, true);
-        Module["FS_createPath"]("/lib/python3.15/ctypes", "macholib", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "curses", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "dbm", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "email", true, true);
-        Module["FS_createPath"]("/lib/python3.15/email", "mime", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "encodings", true, true);
-        Module["FS_createPath"]("/lib/python3.15/encodings", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "ensurepip", true, true);
-        Module["FS_createPath"]("/lib/python3.15/ensurepip", "_bundled", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "html", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "http", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "idlelib", true, true);
-        Module["FS_createPath"]("/lib/python3.15/idlelib", "Icons", true, true);
-        Module["FS_createPath"]("/lib/python3.15/idlelib", "idle_test", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "importlib", true, true);
-        Module["FS_createPath"]("/lib/python3.15/importlib", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/importlib", "metadata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/importlib", "resources", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "json", true, true);
-        Module["FS_createPath"]("/lib/python3.15/json", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "logging", true, true);
-        Module["FS_createPath"]("/lib/python3.15/logging", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "multiprocessing", true, true);
-        Module["FS_createPath"]("/lib/python3.15/multiprocessing", "dummy", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "pathlib", true, true);
-        Module["FS_createPath"]("/lib/python3.15/pathlib", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "profiling", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling", "sampling", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_assets", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_flamegraph_assets", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_heatmap_assets", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_shared_assets", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_vendor", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor", "d3-flame-graph", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor/d3-flame-graph", "4.1.3", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor", "d3", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor/d3", "7.8.5", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "live_collector", true, true);
-        Module["FS_createPath"]("/lib/python3.15/profiling", "tracing", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "pydoc_data", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "re", true, true);
-        Module["FS_createPath"]("/lib/python3.15/re", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "site-packages", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "sqlite3", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "string", true, true);
-        Module["FS_createPath"]("/lib/python3.15/string", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "sysconfig", true, true);
-        Module["FS_createPath"]("/lib/python3.15/sysconfig", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "test", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "archivetestdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "audiodata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "audit_test_data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "certdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/certdata", "capath", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "cjkencodings", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "configdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "crashers", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "decimaltestdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "dtracedata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "encoded_modules", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "leakers", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "libregrtest", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "mathdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "regrtestdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/regrtestdata", "import_from_tests", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/regrtestdata/import_from_tests", "test_regrtest_b", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "subprocessdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "support", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/support", "_hypothesis_stubs", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_ast", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_ast", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_asyncio", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_capi", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_cext", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_concurrent_futures", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_cppext", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_ctypes", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_dataclasses", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_doctest", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_email", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_email", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_free_threading", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_future_stmt", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_gdb", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_import", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "circular_imports", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data/circular_imports", "subpkg", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data/circular_imports", "subpkg2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data/circular_imports/subpkg2", "parent", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package3", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package4", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "unwritable", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_importlib", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "builtin", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "extension", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "frozen", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "import_", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "metadata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data", "sources", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources", "example", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources/example", "example", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources", "example2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources/example2", "example2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "namespace_pkgs", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "both_portions", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/both_portions", "foo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "foo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "module_and_namespace_package", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/module_and_namespace_package", "a_test", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "not_a_namespace_pkg", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/not_a_namespace_pkg", "foo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "portion1", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/portion1", "foo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "portion2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/portion2", "foo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "project1", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project1", "parent", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project1/parent", "child", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "project2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project2", "parent", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project2/parent", "child", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "project3", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project3", "parent", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project3/parent", "child", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "partial", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "resources", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "source", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_inspect", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_interpreters", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_io", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_json", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_module", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_multiprocessing_fork", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_multiprocessing_forkserver", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_multiprocessing_spawn", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_os", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_pathlib", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_pathlib", "support", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_peg_generator", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_profiling", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_profiling", "test_sampling_profiler", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_pydoc", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_pyrepl", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_sqlite3", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_string", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_tkinter", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_tomllib", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data", "invalid", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "array-of-tables", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "array", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "boolean", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "dates-and-times", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "dotted-keys", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "inline-table", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "keys-and-vals", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "literal-str", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "multiline-basic-str", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "multiline-literal-str", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "table", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data", "valid", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/valid", "array", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/valid", "dates-and-times", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/valid", "multiline-basic-str", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_tools", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tools", "i18n_data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_tools", "msgfmt_data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_ttk", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_unittest", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_unittest", "namespace_test_pkg", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_unittest/namespace_test_pkg", "bar", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_unittest/namespace_test_pkg", "noop", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_unittest/namespace_test_pkg/noop", "no2", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_unittest", "testmock", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_warnings", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_warnings", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_zipfile", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_zipfile", "_path", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "test_zoneinfo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/test_zoneinfo", "data", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "tkinterdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "tokenizedata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "tracedmodules", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "translationdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/translationdata", "argparse", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/translationdata", "getopt", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/translationdata", "optparse", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "typinganndata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/typinganndata", "partialexecution", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "wheeldata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "xmltestdata", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test/xmltestdata", "c14n-20", true, true);
-        Module["FS_createPath"]("/lib/python3.15/test", "zipimport_data", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "tkinter", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "tomllib", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "turtledemo", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "unittest", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "urllib", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "venv", true, true);
-        Module["FS_createPath"]("/lib/python3.15/venv", "scripts", true, true);
-        Module["FS_createPath"]("/lib/python3.15/venv/scripts", "common", true, true);
-        Module["FS_createPath"]("/lib/python3.15/venv/scripts", "nt", true, true);
-        Module["FS_createPath"]("/lib/python3.15/venv/scripts", "posix", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "wsgiref", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "xml", true, true);
-        Module["FS_createPath"]("/lib/python3.15/xml", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/xml", "dom", true, true);
-        Module["FS_createPath"]("/lib/python3.15/xml", "etree", true, true);
-        Module["FS_createPath"]("/lib/python3.15/xml/etree", "__pycache__", true, true);
-        Module["FS_createPath"]("/lib/python3.15/xml", "parsers", true, true);
-        Module["FS_createPath"]("/lib/python3.15/xml", "sax", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "xmlrpc", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "zipfile", true, true);
-        Module["FS_createPath"]("/lib/python3.15/zipfile", "_path", true, true);
-        Module["FS_createPath"]("/lib/python3.15", "zoneinfo", true, true);
-        Module["FS_createPath"]("/lib/python3.15/zoneinfo", "__pycache__", true, true);
 
         function DataRequest(start, end, audio) {
           this.start = start;
@@ -2222,10 +1966,9 @@ var Module = (() => {
           for (var i = 0; i < files.length; ++i) {
             DataRequest.prototype.requests[files[i].filename].onload()
           }
-          Module["FS_logStats"]?.();
-          Module["removeRunDependency"]("datafile_/root/elfconv/build/bash-static.generated.data")
+          Module["removeRunDependency"]("datafile_" + PACKAGE_NAME)
         }
-        Module["addRunDependency"]("datafile_/root/elfconv/build/bash-static.generated.data");
+        Module["addRunDependency"]("datafile_" + PACKAGE_NAME);
         Module["preloadResults"] ??= {};
         Module["preloadResults"][PACKAGE_NAME] = {
           fromCache: false
@@ -2237,12 +1980,279 @@ var Module = (() => {
           fetchedCallback = processPackageData
         }
       }
-      // Call runWithFS immediately to set up file system structure and start loading
       runWithFS(Module);
     };
 
+    // Metadata for preloaded ELF binaries at /usr/bin
+    Module["userbinMetadata"] = {
+      packageDataName: "userbin.data",
+      files: [{
+        filename: "/usr/bin/bash-static",
+        start: 0,
+        end: 2061088
+      }, {
+        filename: "/usr/bin/busybox",
+        start: 2061088,
+        end: 5100752
+      }, {
+        filename: "/usr/bin/python",
+        start: 5100752,
+        end: 46128712
+      }],
+      remote_package_size: 46128712
+    };
+
+    // Create Python library directory structure (called before loading python.data)
+    // Create Python library directory structure (called before loading python.data)
+    Module["createPythonLibraryPaths"] = function () {
+      Module["FS_createPath"]("/lib", "python3.15", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "lib-dynload", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "__phello__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/__phello__", "ham", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "_pyrepl", true, true);
+      Module["FS_createPath"]("/lib/python3.15/_pyrepl", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "asyncio", true, true);
+      Module["FS_createPath"]("/lib/python3.15/asyncio", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "collections", true, true);
+      Module["FS_createPath"]("/lib/python3.15/collections", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "compression", true, true);
+      Module["FS_createPath"]("/lib/python3.15/compression", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/compression", "_common", true, true);
+      Module["FS_createPath"]("/lib/python3.15/compression/_common", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/compression", "zstd", true, true);
+      Module["FS_createPath"]("/lib/python3.15/compression/zstd", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "concurrent", true, true);
+      Module["FS_createPath"]("/lib/python3.15/concurrent", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/concurrent", "futures", true, true);
+      Module["FS_createPath"]("/lib/python3.15/concurrent/futures", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/concurrent", "interpreters", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "ctypes", true, true);
+      Module["FS_createPath"]("/lib/python3.15/ctypes", "macholib", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "curses", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "dbm", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "email", true, true);
+      Module["FS_createPath"]("/lib/python3.15/email", "mime", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "encodings", true, true);
+      Module["FS_createPath"]("/lib/python3.15/encodings", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "ensurepip", true, true);
+      Module["FS_createPath"]("/lib/python3.15/ensurepip", "_bundled", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "html", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "http", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "idlelib", true, true);
+      Module["FS_createPath"]("/lib/python3.15/idlelib", "Icons", true, true);
+      Module["FS_createPath"]("/lib/python3.15/idlelib", "idle_test", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "importlib", true, true);
+      Module["FS_createPath"]("/lib/python3.15/importlib", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/importlib", "metadata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/importlib", "resources", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "json", true, true);
+      Module["FS_createPath"]("/lib/python3.15/json", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "logging", true, true);
+      Module["FS_createPath"]("/lib/python3.15/logging", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "multiprocessing", true, true);
+      Module["FS_createPath"]("/lib/python3.15/multiprocessing", "dummy", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "pathlib", true, true);
+      Module["FS_createPath"]("/lib/python3.15/pathlib", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "profiling", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling", "sampling", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_assets", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_flamegraph_assets", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_heatmap_assets", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_shared_assets", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "_vendor", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor", "d3-flame-graph", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor/d3-flame-graph", "4.1.3", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor", "d3", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling/_vendor/d3", "7.8.5", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling/sampling", "live_collector", true, true);
+      Module["FS_createPath"]("/lib/python3.15/profiling", "tracing", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "pydoc_data", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "re", true, true);
+      Module["FS_createPath"]("/lib/python3.15/re", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "site-packages", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "sqlite3", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "string", true, true);
+      Module["FS_createPath"]("/lib/python3.15/string", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "sysconfig", true, true);
+      Module["FS_createPath"]("/lib/python3.15/sysconfig", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "test", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "archivetestdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "audiodata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "audit_test_data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "certdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/certdata", "capath", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "cjkencodings", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "configdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "crashers", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "decimaltestdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "dtracedata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "encoded_modules", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "leakers", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "libregrtest", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "mathdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "regrtestdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/regrtestdata", "import_from_tests", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/regrtestdata/import_from_tests", "test_regrtest_b", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "subprocessdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "support", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/support", "_hypothesis_stubs", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_ast", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_ast", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_asyncio", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_capi", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_cext", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_concurrent_futures", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_cppext", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_ctypes", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_dataclasses", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_doctest", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_email", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_email", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_free_threading", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_future_stmt", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_gdb", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_import", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "circular_imports", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data/circular_imports", "subpkg", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data/circular_imports", "subpkg2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data/circular_imports/subpkg2", "parent", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package3", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "package4", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_import/data", "unwritable", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_importlib", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "builtin", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "extension", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "frozen", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "import_", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "metadata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data", "sources", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources", "example", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources/example", "example", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources", "example2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/metadata/data/sources/example2", "example2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "namespace_pkgs", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "both_portions", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/both_portions", "foo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "foo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "module_and_namespace_package", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/module_and_namespace_package", "a_test", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "not_a_namespace_pkg", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/not_a_namespace_pkg", "foo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "portion1", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/portion1", "foo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "portion2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/portion2", "foo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "project1", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project1", "parent", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project1/parent", "child", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "project2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project2", "parent", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project2/parent", "child", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs", "project3", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project3", "parent", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib/namespace_pkgs/project3/parent", "child", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "partial", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "resources", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_importlib", "source", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_inspect", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_interpreters", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_io", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_json", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_module", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_multiprocessing_fork", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_multiprocessing_forkserver", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_multiprocessing_spawn", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_os", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_pathlib", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_pathlib", "support", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_peg_generator", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_profiling", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_profiling", "test_sampling_profiler", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_pydoc", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_pyrepl", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_sqlite3", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_string", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_tkinter", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_tomllib", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data", "invalid", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "array-of-tables", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "array", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "boolean", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "dates-and-times", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "dotted-keys", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "inline-table", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "keys-and-vals", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "literal-str", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "multiline-basic-str", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "multiline-literal-str", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/invalid", "table", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data", "valid", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/valid", "array", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/valid", "dates-and-times", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tomllib/data/valid", "multiline-basic-str", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_tools", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tools", "i18n_data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_tools", "msgfmt_data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_ttk", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_unittest", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_unittest", "namespace_test_pkg", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_unittest/namespace_test_pkg", "bar", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_unittest/namespace_test_pkg", "noop", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_unittest/namespace_test_pkg/noop", "no2", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_unittest", "testmock", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_warnings", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_warnings", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_zipfile", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_zipfile", "_path", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "test_zoneinfo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/test_zoneinfo", "data", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "tkinterdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "tokenizedata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "tracedmodules", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "translationdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/translationdata", "argparse", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/translationdata", "getopt", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/translationdata", "optparse", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "typinganndata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/typinganndata", "partialexecution", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "wheeldata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "xmltestdata", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test/xmltestdata", "c14n-20", true, true);
+      Module["FS_createPath"]("/lib/python3.15/test", "zipimport_data", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "tkinter", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "tomllib", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "turtledemo", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "unittest", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "urllib", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "venv", true, true);
+      Module["FS_createPath"]("/lib/python3.15/venv", "scripts", true, true);
+      Module["FS_createPath"]("/lib/python3.15/venv/scripts", "common", true, true);
+      Module["FS_createPath"]("/lib/python3.15/venv/scripts", "nt", true, true);
+      Module["FS_createPath"]("/lib/python3.15/venv/scripts", "posix", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "wsgiref", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "xml", true, true);
+      Module["FS_createPath"]("/lib/python3.15/xml", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/xml", "dom", true, true);
+      Module["FS_createPath"]("/lib/python3.15/xml", "etree", true, true);
+      Module["FS_createPath"]("/lib/python3.15/xml/etree", "__pycache__", true, true);
+      Module["FS_createPath"]("/lib/python3.15/xml", "parsers", true, true);
+      Module["FS_createPath"]("/lib/python3.15/xml", "sax", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "xmlrpc", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "zipfile", true, true);
+      Module["FS_createPath"]("/lib/python3.15/zipfile", "_path", true, true);
+      Module["FS_createPath"]("/lib/python3.15", "zoneinfo", true, true);
+      Module["FS_createPath"]("/lib/python3.15/zoneinfo", "__pycache__", true, true);
+    };
+
     // Store the Python library metadata
-    Module["pythonLibraryMetadata"] = {
+    Module["pythonLibraryMetadata"] = { packageDataName: "python.data",
       files: [{
         filename: "/lib/python3.15/__future__.py",
         start: 0,
@@ -12744,6 +12754,7 @@ var Module = (() => {
       }],
       remote_package_size: 52704455
     };
+
     var FS_modeStringToFlags = str => {
       var flagModes = {
         r: 0,
@@ -13971,81 +13982,41 @@ var Module = (() => {
               ["ps", "busybox"],
               ["wc", "busybox"],
               ["awk", "busybox"],
-              ["base64", "busybox"],
-              ["cal", "busybox"],
-              ["cksum", "busybox"],
-              ["cmp", "busybox"],
-              ["comm", "busybox"],
-              ["cut", "busybox"],
-              ["dd", "busybox"],
-              ["diff", "busybox"],
-              ["dos2unix", "busybox"],
-              ["du", "busybox"],
-              ["echo", "busybox"],
-              ["ed", "busybox"],
-              ["env", "busybox"],
-              ["expand", "busybox"],
-              ["factor", "busybox"],
-              ["false", "busybox"],
               ["find", "busybox"],
-              ["fold", "busybox"],
               ["free", "busybox"],
               ["grep", "busybox"],
-              ["egrep", "busybox"],
-              ["fgrep", "busybox"],
-              ["groups", "busybox"],
-              ["hd", "busybox"],
-              ["hexdump", "busybox"],
               ["id", "busybox"],
               ["less", "busybox"],
-              ["link", "busybox"],
-              ["logname", "busybox"],
+              ["sed", "busybox"],
+              ["sort", "busybox"],
+              ["whoami", "busybox"],
+              ["base64", "busybox"],
+              ["cut", "busybox"],
+              ["factor", "busybox"],
+              ["fold", "busybox"],
               ["md5sum", "busybox"],
-              ["mktemp", "busybox"],
-              ["more", "busybox"],
               ["nl", "busybox"],
-              ["nproc", "busybox"],
               ["od", "busybox"],
               ["paste", "busybox"],
               ["printenv", "busybox"],
               ["printf", "busybox"],
-              ["pwd", "busybox"],
               ["readlink", "busybox"],
               ["realpath", "busybox"],
-              ["reset", "busybox"],
               ["rev", "busybox"],
-              ["sed", "busybox"],
-              ["sha1sum", "busybox"],
               ["sha256sum", "busybox"],
-              ["sha512sum", "busybox"],
-              ["shuf", "busybox"],
-              ["sort", "busybox"],
               ["stat", "busybox"],
               ["strings", "busybox"],
-              ["stty", "busybox"],
-              ["sum", "busybox"],
               ["tac", "busybox"],
               ["tee", "busybox"],
-              ["test", "busybox"],
-              ["time", "busybox"],
-              ["timeout", "busybox"],
               ["tr", "busybox"],
               ["true", "busybox"],
+              ["false", "busybox"],
               ["truncate", "busybox"],
-              ["tsort", "busybox"],
-              ["tty", "busybox"],
               ["uniq", "busybox"],
-              ["unix2dos", "busybox"],
               ["unlink", "busybox"],
-              ["usleep", "busybox"],
-              ["users", "busybox"],
-              ["w", "busybox"],
               ["which", "busybox"],
-              ["who", "busybox"],
-              ["whoami", "busybox"],
               ["xargs", "busybox"],
-              ["xxd", "busybox"],
-              ["yes", "busybox"]
+              ["xxd", "busybox"]
             ]));
           }
         }
@@ -16160,10 +16131,21 @@ var Module = (() => {
       async function doRun() {
         await initRuntime();
 
-        // Load Python libraries after FS is initialized
+        // Load preloaded ELF binaries after FS is initialized
+        if (Module["loadPackage"] && Module["userbinMetadata"] && !Module["userbinLoaded"]) {
+          Module["userbinLoaded"] = true;
+          console.log("Loading preloaded ELF binaries into /usr/bin ...");
+          Module["loadPackage"](Module["userbinMetadata"]);
+          if (runDependencies > 0) {
+            await new Promise(resolve => { dependenciesFulfilled = resolve; });
+          }
+        }
+
+        // Load Python standard library after FS is initialized
         if (Module["loadPackage"] && Module["pythonLibraryMetadata"] && !Module["pythonLibrariesLoaded"]) {
           Module["pythonLibrariesLoaded"] = true;
-          console.log("Loading Python libraries after initRuntime...");
+          console.log("Loading Python libraries ...");
+          Module["createPythonLibraryPaths"]();
           Module["loadPackage"](Module["pythonLibraryMetadata"]);
           if (runDependencies > 0) {
             await new Promise(resolve => { dependenciesFulfilled = resolve; });
