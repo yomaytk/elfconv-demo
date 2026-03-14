@@ -34,8 +34,8 @@ var Module = (() => {
     var FIFO_AtomicBuf;
 
     // edited by *.generated.js
-    var meForkedP = 1115560;
-    var meExecvedP = 1115564;
+    var meForkedP = 1115496;
+    var meExecvedP = 1115500;
 
     // Linux macro
     const __FD_SETSIZE = 1024;
@@ -217,7 +217,7 @@ var Module = (() => {
     }
 
     function initRuntime() {
-      wasmExports["ga"]();
+      wasmExports["Vc"]();
     }
 
     function preMain() { }
@@ -326,7 +326,7 @@ var Module = (() => {
 
       function receiveInstance(instance) {
         wasmExports = instance.exports;
-        wasmTable = wasmExports["vc"];
+        wasmTable = wasmExports["Fc"];
         return wasmExports
       }
 
@@ -801,6 +801,10 @@ var Module = (() => {
     const ECV_FIFO_READ = 10006;
     const ECV_FIFO_WRITE = 10007;
 
+    // emscripten-specific syscalls (not in Linux AArch64 table)
+    const ECV_CHMOD = 10008;
+    const ECV_FD_FDSTAT_GET = 10009;
+
     // This function assumes that emscripten JS syscall is executed synchronously.
     function ecvProxySyscallJs(sysNum, ...callArgs) {
 
@@ -1131,6 +1135,39 @@ var Module = (() => {
     function ___syscall_utimensat(dirfd, path, times, flags) {
       return ecvProxySyscallJs(ECV_UTIMENSAT, dirfd, path, times, flags);
     }
+
+    function ___syscall_chmod(path, mode) {
+      return ecvProxySyscallJs(ECV_CHMOD, path, mode);
+    }
+
+    function ___syscall_fchmod(fd, mode) {
+      return ecvProxySyscallJs(ECV_FCHMOD, fd, mode);
+    }
+
+    function ___syscall_fchmodat2(dirfd, path, mode, flags) {
+      return ecvProxySyscallJs(ECV_FCHMODAT, dirfd, path, mode, flags);
+    }
+
+    function ___syscall_fchownat(dirfd, path, owner, group, flags) {
+      return ecvProxySyscallJs(ECV_FCHOWNAT, dirfd, path, owner, group, flags);
+    }
+
+    function ___syscall_fdatasync(fd) {
+      return ecvProxySyscallJs(ECV_FDATASYNC, fd);
+    }
+
+    function ___syscall_renameat(olddirfd, oldpath, newdirfd, newpath) {
+      return ecvProxySyscallJs(ECV_RENAMEAT, olddirfd, oldpath, newdirfd, newpath);
+    }
+
+    function ___syscall_symlinkat(target, dirfd, linkpath) {
+      return ecvProxySyscallJs(ECV_SYMLINKAT, target, dirfd, linkpath);
+    }
+
+    function _fd_fdstat_get(fd, pbuf) {
+      return ecvProxySyscallJs(ECV_FD_FDSTAT_GET, fd, pbuf);
+    }
+
     var __abort_js = () => abort("");
     var runtimeKeepaliveCounter = 0;
     var __emscripten_runtime_keepalive_clear = () => {
@@ -1277,6 +1314,11 @@ var Module = (() => {
     var FILE_Read = (fd, iov, iovcnt, pnum) => {
       return ecvProxySyscallJs(ECV_READ, fd, iov, iovcnt, pnum);
     };
+
+    var FILE_PRead = (fd, iov, iovcnt, offset, pnum) => {
+      return ecvProxySyscallJs(ECV_PREAD, fd, iov, iovcnt, offset, pnum);
+    }
+
     var PTY_handleSleepRead = (fd, iov, iovcnt, pnum) => {
       return PTY_saveResult(wakeup => {
         let res = ecvProxySyscallJs(ECV_READ, fd, iov, iovcnt, pnum);
@@ -1349,8 +1391,31 @@ var Module = (() => {
       }
     };
 
+    var handleDevicePRead = (devType) => {
+      switch (devType) {
+        // File
+        case S_IFREG:
+          return FILE_PRead;
+        // FIFO
+        case S_IFIFO:
+        // Character device (TTY)
+        case S_IFCHR:
+        default:
+          throw new Error(`Device Type (${devType}) must be 'S_IFREG' at _fd_pread now.`);
+      }
+    };
+
     function ___syscall_pipe2(pipefd, flags) {
       return ecvProxySyscallJs(ECV_PIPE2, pipefd, flags);
+    }
+
+    function _fd_pread(fd, iov, iovcnt, offset, pnum) {
+      let offseti53 = bigintToI53Checked(offset);
+      if (offseti53 == NaN) {
+        console.log(`offset (${offset}) cannot be converted to BigInt at _fd_pread.`);
+        abort();
+      }
+      return handleDevicePRead(ecvProxySyscallJs(ECV_GET_DEV_TYPE, fd))(fd, iov, iovcnt, offseti53, pnum);
     }
 
     function _fd_read(fd, iov, iovcnt, pnum) {
@@ -1373,6 +1438,10 @@ var Module = (() => {
     var FILE_Write = (fd, iov, iovcnt, pnum) => {
       return ecvProxySyscallJs(ECV_WRITE, fd, iov, iovcnt, pnum);
     };
+
+    var FILE_PWrite = (fd, iov, iovcnt, offset, pnum) => {
+      return ecvProxySyscallJs(ECV_PWRITE, fd, iov, iovcnt, offset, pnum);
+    }
 
     var FIFO_Write = (fd, iov, iovcnt, pnum) => {
       if (iovcnt != 1) {
@@ -1415,6 +1484,29 @@ var Module = (() => {
           throw new Error(`Device Type (${devType}) must be 'S_IFREG' or 'S_IFCHR' or 'S_IFIFO' at _fd_write now.`);
       }
     };
+
+    var handleDevicePWrite = (devType) => {
+      switch (devType) {
+        // File
+        case S_IFREG:
+          return FILE_PWrite;
+        // Character device (TTY)
+        case S_IFCHR:
+        // FIFO
+        case S_IFIFO:
+        default:
+          throw new Error(`Device Type (${devType}) must be 'S_IFREG' at _fd_pwrite now.`);
+      }
+    };
+
+    function _fd_pwrite(fd, iov, iovcnt, offset, pnum) {
+      let offseti53 = bigintToI53Checked(offset);
+      if (offseti53 == NaN) {
+        console.log(`offset (${offset}) cannot be converted to BigInt at _fd_pwrite.`);
+        abort();
+      }
+      return handleDevicePWrite(ecvProxySyscallJs(ECV_GET_DEV_TYPE, fd))(fd, iov, iovcnt, offseti53, pnum);
+    }
 
     function _fd_write(fd, iov, iovcnt, pnum) {
       return handleDeviceWrite(ecvProxySyscallJs(ECV_GET_DEV_TYPE, fd))(fd, iov, iovcnt, pnum);
@@ -1475,66 +1567,76 @@ var Module = (() => {
     function assignWasmImports() {
       wasmImports = {
         e: ___ecv_syscall_ioctl,
-        ca: ___syscall_clone,
-        ba: ___syscall_execve,
+        ma: ___syscall_clone,
+        la: ___syscall_execve,
         m: ___syscall_exit,
-        da: ___syscall_getpgid,
-        x: ___syscall_pipe2,
-        g: ___syscall_poll,
-        h: ___syscall_pselect6,
-        n: ___syscall_sendfile,
-        ea: ___syscall_setpgid,
-        aa: ___syscall_wait4,
-        A: ___call_sighandler,
+        na: ___syscall_getpgid,
+        F: ___syscall_pipe2,
+        h: ___syscall_poll,
+        i: ___syscall_pselect6,
+        x: ___syscall_sendfile,
+        oa: ___syscall_setpgid,
+        ka: ___syscall_wait4,
+        C: ___call_sighandler,
         l: ___cxa_throw,
-        _: ___syscall_chdir,
-        Y: ___syscall_dup,
-        X: ___syscall_dup3,
-        V: ___syscall_faccessat,
+        ia: ___syscall_chdir,
+        ba: ___syscall_chmod,
+        ga: ___syscall_dup,
+        fa: ___syscall_dup3,
+        da: ___syscall_faccessat,
+        ca: ___syscall_fchmod,
+        aa: ___syscall_fchmodat2,
+        _: ___syscall_fchownat,
         c: ___syscall_fcntl64,
-        S: ___syscall_fstat64,
-        N: ___syscall_ftruncate64,
-        M: ___syscall_getcwd,
-        L: ___syscall_getdents64,
-        i: ___syscall_ioctl,
-        P: ___syscall_lstat64,
-        G: ___syscall_mkdirat,
-        Q: ___syscall_newfstatat,
-        F: ___syscall_openat,
-        z: ___syscall_readlinkat,
-        R: ___syscall_stat64,
-        y: ___syscall_statfs64,
+        Z: ___syscall_fdatasync,
+        W: ___syscall_fstat64,
+        R: ___syscall_ftruncate64,
+        Q: ___syscall_getcwd,
+        P: ___syscall_getdents64,
+        j: ___syscall_ioctl,
+        T: ___syscall_lstat64,
+        K: ___syscall_mkdirat,
+        U: ___syscall_newfstatat,
+        $: ___syscall_openat,
+        B: ___syscall_readlinkat,
+        A: ___syscall_renameat,
+        V: ___syscall_stat64,
+        z: ___syscall_statfs64,
+        y: ___syscall_symlinkat,
         v: ___syscall_truncate64,
         u: ___syscall_unlinkat,
         t: ___syscall_utimensat,
-        $: __abort_js,
-        J: __emscripten_init_main_thread_js,
+        ja: __abort_js,
+        N: __emscripten_init_main_thread_js,
         w: __emscripten_notify_mailbox_postmessage,
-        E: __emscripten_receive_on_main_thread_js,
-        C: __emscripten_runtime_keepalive_clear,
-        o: __emscripten_thread_cleanup,
-        I: __emscripten_thread_mailbox_await,
-        U: __emscripten_thread_set_strongref,
-        p: __tzset_js,
-        Z: _clock_time_get,
-        fa: ecv_proxy_process_memory_copy_req,
-        D: _emscripten_check_blocking_allowed,
-        W: _emscripten_date_now,
-        T: _emscripten_exit_with_live_runtime,
+        I: __emscripten_receive_on_main_thread_js,
+        E: __emscripten_runtime_keepalive_clear,
+        n: __emscripten_thread_cleanup,
+        M: __emscripten_thread_mailbox_await,
+        Y: __emscripten_thread_set_strongref,
+        o: __tzset_js,
+        ha: _clock_time_get,
+        pa: ecv_proxy_process_memory_copy_req,
+        H: _emscripten_check_blocking_allowed,
+        ea: _emscripten_date_now,
+        X: _emscripten_exit_with_live_runtime,
         b: _emscripten_get_now,
-        s: _emscripten_resize_heap,
-        q: _environ_get,
-        r: _environ_sizes_get,
-        ga: execve_memory_copy_req,
+        r: _emscripten_resize_heap,
+        p: _environ_get,
+        q: _environ_sizes_get,
+        qa: execve_memory_copy_req,
         k: _exit,
-        f: _fd_close,
-        j: _fd_read,
-        H: _fd_seek,
-        O: _fd_sync,
+        g: _fd_close,
+        s: _fd_fdstat_get,
+        J: _fd_pread,
+        G: _fd_pwrite,
+        f: _fd_read,
+        L: _fd_seek,
+        S: _fd_sync,
         d: _fd_write,
         a: wasmMemory,
-        B: _proc_exit,
-        K: _random_get
+        D: _proc_exit,
+        O: _random_get
       }
     }
 
@@ -1543,10 +1645,10 @@ var Module = (() => {
     async function initWasmInstance() {
       // init Wasm module
       wasmExports = await instantiateWasm();
-      _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["wc"])(a0, a1);
-      __emscripten_stack_restore = a0 => (__emscripten_stack_restore = wasmExports["Uc"])(a0);
-      __emscripten_stack_alloc = a0 => (__emscripten_stack_alloc = wasmExports["Vc"])(a0);
-      _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmExports["Wc"])();
+      _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["Gc"])(a0, a1);
+      __emscripten_stack_restore = a0 => (__emscripten_stack_restore = wasmExports["cd"])(a0);
+      __emscripten_stack_alloc = a0 => (__emscripten_stack_alloc = wasmExports["dd"])(a0);
+      _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmExports["ed"])();
 
       preInit();
       moduleRtn = readyPromise;

@@ -367,12 +367,22 @@ var Module = (() => {
 
       // call the target kernel function.
       let sysRval = tgtKernelFunction(...sysArgs);
-      // store the return value of syscall function executing.
-      m32View[sysRvalPtr] = sysRval;
 
-      // notify to process worker
-      Atomics.store(m32View, waitPtr, 1);
-      Atomics.notify(m32View, waitPtr, 1);
+      // support async syscall handlers (e.g. poll with timeout)
+      if (sysRval instanceof Promise) {
+        sysRval.then(val => {
+          m32View[sysRvalPtr] = val;
+          Atomics.store(m32View, waitPtr, 1);
+          Atomics.notify(m32View, waitPtr, 1);
+        });
+      } else {
+        // store the return value of syscall function executing.
+        m32View[sysRvalPtr] = sysRval;
+
+        // notify to process worker
+        Atomics.store(m32View, waitPtr, 1);
+        Atomics.notify(m32View, waitPtr, 1);
+      }
     }
 
     function exitHandling(workerId) {
@@ -981,6 +991,10 @@ var Module = (() => {
     const ECV_FIFO_READ = 10006;
     const ECV_FIFO_WRITE = 10007;
 
+    // emscripten-specific syscalls (not in Linux AArch64 table)
+    const ECV_CHMOD = 10008;
+    const ECV_FD_FDSTAT_GET = 10009;
+
     SysFuncMap.set(ECV_CLONE, ___syscall_clone);
     SysFuncMap.set(ECV_WAIT4, ___syscall_wait4);
     SysFuncMap.set(ECV_EXECVE, ___syscall_execve);
@@ -1009,8 +1023,10 @@ var Module = (() => {
     SysFuncMap.set(ECV_CLOSE, _fd_close);
     SysFuncMap.set(ECV_PIPE2, ___syscall_pipe2);
     SysFuncMap.set(ECV_READ, _fd_read);
+    SysFuncMap.set(ECV_PREAD, _fd_pread);
     SysFuncMap.set(ECV_LSEEK, _fd_seek);
     SysFuncMap.set(ECV_WRITE, _fd_write);
+    SysFuncMap.set(ECV_PWRITE, _fd_pwrite);
     SysFuncMap.set(ECV_EXIT, ___syscall_exit);
     SysFuncMap.set(ECV_GETRANDOM, _random_get);
     SysFuncMap.set(ECV_SETPGID, ___syscall_setpgid);
@@ -1029,6 +1045,16 @@ var Module = (() => {
     SysFuncMap.set(ECV_GET_DEV_TYPE, ___ecv_get_dev_type);
     SysFuncMap.set(ECV_FIFO_READ, _fd_fifo_read);
     SysFuncMap.set(ECV_FIFO_WRITE, _fd_fifo_write);
+
+    // new filesystem syscalls
+    SysFuncMap.set(ECV_CHMOD, ___syscall_chmod);
+    SysFuncMap.set(ECV_FCHMOD, ___syscall_fchmod);
+    SysFuncMap.set(ECV_FCHMODAT, ___syscall_fchmodat);
+    SysFuncMap.set(ECV_FCHOWNAT, ___syscall_fchownat);
+    SysFuncMap.set(ECV_FDATASYNC, ___syscall_fdatasync);
+    SysFuncMap.set(ECV_RENAMEAT, ___syscall_renameat);
+    SysFuncMap.set(ECV_SYMLINKAT, ___syscall_symlinkat);
+    SysFuncMap.set(ECV_FD_FDSTAT_GET, _fd_fdstat_get);
 
 
     class ExitStatus {
@@ -13855,7 +13881,6 @@ var Module = (() => {
         FS.mkdir("/home/web_user");
         FS.mkdir("/usr");
         FS.mkdir("/usr/bin");
-        FS.mkdir("/lib");
       },
       createDefaultDevices() {
         FS.mkdir("/dev");
@@ -13918,19 +13943,109 @@ var Module = (() => {
               ["arch", "busybox"],
               ["ascii", "busybox"],
               ["basename", "busybox"],
+              ["chmod", "busybox"],
+              ["chown", "busybox"],
               ["clear", "busybox"],
+              ["cp", "busybox"],
               ["date", "busybox"],
+              ["dirname", "busybox"],
+              ["expr", "busybox"],
+              ["head", "busybox"],
               ["hostname", "busybox"],
+              ["ln", "busybox"],
               ["ls", "busybox"],
               ["mkdir", "busybox"],
+              ["mv", "busybox"],
               ["rm", "busybox"],
               ["rmdir", "busybox"],
+              ["seq", "busybox"],
+              ["sleep", "busybox"],
+              ["tail", "busybox"],
+              ["top", "busybox"],
               ["tree", "busybox"],
               ["uname", "busybox"],
+              ["uptime", "busybox"],
               ["vi", "busybox"],
               ["cat", "busybox"],
               ["touch", "busybox"],
-              ["ps", "busybox"]
+              ["ps", "busybox"],
+              ["wc", "busybox"],
+              ["awk", "busybox"],
+              ["base64", "busybox"],
+              ["cal", "busybox"],
+              ["cksum", "busybox"],
+              ["cmp", "busybox"],
+              ["comm", "busybox"],
+              ["cut", "busybox"],
+              ["dd", "busybox"],
+              ["diff", "busybox"],
+              ["dos2unix", "busybox"],
+              ["du", "busybox"],
+              ["echo", "busybox"],
+              ["ed", "busybox"],
+              ["env", "busybox"],
+              ["expand", "busybox"],
+              ["factor", "busybox"],
+              ["false", "busybox"],
+              ["find", "busybox"],
+              ["fold", "busybox"],
+              ["free", "busybox"],
+              ["grep", "busybox"],
+              ["egrep", "busybox"],
+              ["fgrep", "busybox"],
+              ["groups", "busybox"],
+              ["hd", "busybox"],
+              ["hexdump", "busybox"],
+              ["id", "busybox"],
+              ["less", "busybox"],
+              ["link", "busybox"],
+              ["logname", "busybox"],
+              ["md5sum", "busybox"],
+              ["mktemp", "busybox"],
+              ["more", "busybox"],
+              ["nl", "busybox"],
+              ["nproc", "busybox"],
+              ["od", "busybox"],
+              ["paste", "busybox"],
+              ["printenv", "busybox"],
+              ["printf", "busybox"],
+              ["pwd", "busybox"],
+              ["readlink", "busybox"],
+              ["realpath", "busybox"],
+              ["reset", "busybox"],
+              ["rev", "busybox"],
+              ["sed", "busybox"],
+              ["sha1sum", "busybox"],
+              ["sha256sum", "busybox"],
+              ["sha512sum", "busybox"],
+              ["shuf", "busybox"],
+              ["sort", "busybox"],
+              ["stat", "busybox"],
+              ["strings", "busybox"],
+              ["stty", "busybox"],
+              ["sum", "busybox"],
+              ["tac", "busybox"],
+              ["tee", "busybox"],
+              ["test", "busybox"],
+              ["time", "busybox"],
+              ["timeout", "busybox"],
+              ["tr", "busybox"],
+              ["true", "busybox"],
+              ["truncate", "busybox"],
+              ["tsort", "busybox"],
+              ["tty", "busybox"],
+              ["uniq", "busybox"],
+              ["unix2dos", "busybox"],
+              ["unlink", "busybox"],
+              ["usleep", "busybox"],
+              ["users", "busybox"],
+              ["w", "busybox"],
+              ["which", "busybox"],
+              ["who", "busybox"],
+              ["whoami", "busybox"],
+              ["xargs", "busybox"],
+              ["xxd", "busybox"],
+              ["yes", "busybox"]
             ]));
           }
         }
@@ -14264,9 +14379,16 @@ var Module = (() => {
     };
     var PROCFS = {
       ops_table: null,
+      _bootTime: null,
       init(initPid) {
         PROCFS.mount();
+        PROCFS._bootTime = Date.now();
         this.createMyProc(initPid);
+        // system-wide /proc files
+        FS.mknod("/proc/stat", S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 740);
+        FS.mknod("/proc/meminfo", S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 741);
+        FS.mknod("/proc/uptime", S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 742);
+        FS.mknod("/proc/loadavg", S_IFREG | S_IRUSR | S_IRGRP | S_IROTH, 743);
         // /proc/self
         let selfNode = FS.symlink(`/proc/${initPid}`, `/proc/self`);
         // /proc/self/exe for python (FIXME)
@@ -14455,6 +14577,52 @@ var Module = (() => {
       readProcCmdline(task) {
         return new TextEncoder().encode(task.comm).buffer;
       },
+      readProcSystemStat() {
+        // Minimal /proc/stat for busybox top
+        let now = Date.now();
+        let uptimeMs = now - PROCFS._bootTime;
+        let jiffies = Math.floor(uptimeMs / 10); // USER_HZ=100
+        let user = Math.floor(jiffies * 0.05);
+        let system = Math.floor(jiffies * 0.02);
+        let idle = jiffies - user - system;
+        let lines = [
+          `cpu  ${user} 0 ${system} ${idle} 0 0 0 0 0 0`,
+          `cpu0 ${user} 0 ${system} ${idle} 0 0 0 0 0 0`,
+          `intr 0`,
+          `ctxt 0`,
+          `btime ${Math.floor(PROCFS._bootTime / 1000)}`,
+          `processes 1`,
+          `procs_running 1`,
+          `procs_blocked 0`,
+        ];
+        return new TextEncoder().encode(lines.join("\n") + "\n").buffer;
+      },
+      readProcMeminfo() {
+        let totalKB = 512 * 1024;
+        let freeKB = 256 * 1024;
+        let availKB = 384 * 1024;
+        let buffersKB = 16 * 1024;
+        let cachedKB = 64 * 1024;
+        let lines = [
+          `MemTotal:       ${totalKB} kB`,
+          `MemFree:        ${freeKB} kB`,
+          `MemAvailable:   ${availKB} kB`,
+          `Buffers:        ${buffersKB} kB`,
+          `Cached:         ${cachedKB} kB`,
+          `SwapCached:            0 kB`,
+          `SwapTotal:             0 kB`,
+          `SwapFree:              0 kB`,
+        ];
+        return new TextEncoder().encode(lines.join("\n") + "\n").buffer;
+      },
+      readProcUptime() {
+        let uptimeSec = ((Date.now() - PROCFS._bootTime) / 1000).toFixed(2);
+        let idleSec = (uptimeSec * 0.95).toFixed(2);
+        return new TextEncoder().encode(`${uptimeSec} ${idleSec}\n`).buffer;
+      },
+      readProcLoadavg() {
+        return new TextEncoder().encode("0.00 0.00 0.00 1/1 1\n").buffer;
+      },
       readProcMaps() {
         // Minimal /proc/self/maps template for your 256MiB arena.
         //
@@ -14547,17 +14715,28 @@ var Module = (() => {
           let parent = FS.lookupPath(stream.path, {
             parent: true
           }).node;
-          // get the target content.
-          let task = processes.get(+(parent.name)).task;
           let content;
-          if (stream.node.name === `stat`) {
-            content = PROCFS.readProcStat(task);
-          } else if (stream.node.name === `cmdline`) {
-            content = PROCFS.readProcCmdline(task);
-          } else if (stream.node.name == `maps`) {
-            content = PROCFS.readProcMaps();
+          // system-wide /proc files (parent is "proc")
+          if (parent.name === "proc") {
+            switch (stream.node.name) {
+              case "stat": content = PROCFS.readProcSystemStat(); break;
+              case "meminfo": content = PROCFS.readProcMeminfo(); break;
+              case "uptime": content = PROCFS.readProcUptime(); break;
+              case "loadavg": content = PROCFS.readProcLoadavg(); break;
+              default: throw new FS.ErrnoError(2);
+            }
           } else {
-            throw new FS.ErrnoError(2);
+            // per-process /proc/<pid>/ files
+            let task = processes.get(+(parent.name)).task;
+            if (stream.node.name === `stat`) {
+              content = PROCFS.readProcStat(task);
+            } else if (stream.node.name === `cmdline`) {
+              content = PROCFS.readProcCmdline(task);
+            } else if (stream.node.name == `maps`) {
+              content = PROCFS.readProcMaps();
+            } else {
+              throw new FS.ErrnoError(2);
+            }
           }
           // copy the buffer
           if (position >= content.byteLength) {
@@ -15041,7 +15220,7 @@ var Module = (() => {
             newStream = FS.dupStream(stream, arg);
             return newStream.fd
           }
-          case 1: // F_GETFD
+          case 1:
             return stream.fd_flags & FD_CLOEXEC;
           case 2:
             var arg = syscallGetVarargI();
@@ -15257,12 +15436,10 @@ var Module = (() => {
             return 0
           }
           case 21584: { // FIONCLEX
-            console.log(`FIONCLEX (js-kernel)`);
             stream.fd_flags &= ~FD_CLOEXEC;
             return 0;
           }
           case 21585: { // FIOCLEX
-            console.log(`FIOCLEX (js-kernel)`);
             stream.fd_flags |= FD_CLOEXEC;
             return 0;
           }
@@ -15326,38 +15503,62 @@ var Module = (() => {
     }
 
     function ___syscall_poll_scan(fds, nfds, tmSec, tmNsec) {
-      try {
 
-        growMemViews(gWasmMemory);
+      growMemViews(gWasmMemory);
 
-        let timeout = 0;
-        if (tmSec == -1) {
-          timeout = -1;
-        } else {
-          timeout = tmSec + tmNsec * 1e-9;
-        }
+      let timeoutSec = 0;
+      if (tmSec == -1) {
+        timeoutSec = -1;
+      } else {
+        timeoutSec = tmSec + tmNsec * 1e-9;
+      }
 
-        let nonzero = 0;
-        for (var i = 0; i < nfds; i++) {
-          var pollfd = fds + 8 * i;
-          var fd = HEAP32[pollfd >> 2];
-          var events = HEAP16[pollfd + 4 >> 1];
-          var mask = 32;
-          var stream = FS.getStream(fd);
-          if (stream) {
-            if (stream.stream_ops.poll) {
-              mask = stream.stream_ops.poll(stream, events, timeout)
+      // Scan all FDs for readiness, tolerating PTY "wait again" exceptions.
+      let nonzero = 0;
+      for (var i = 0; i < nfds; i++) {
+        var pollfd = fds + 8 * i;
+        var fd = HEAP32[pollfd >> 2];
+        var events = HEAP16[pollfd + 4 >> 1];
+        var mask = 32;
+        var stream = FS.getStream(fd);
+        if (stream) {
+          if (stream.stream_ops.poll) {
+            try {
+              mask = stream.stream_ops.poll(stream, events, timeoutSec);
+            } catch (e) {
+              // PTY throws ErrnoError(1006) when not readable and timeout is set.
+              if (e.name === "ErrnoError") {
+                mask = 0;
+              } else {
+                throw e;
+              }
             }
           }
-          mask &= events | POLLERR | POLLHUP;
-          if (mask) nonzero++;
-          HEAP16[pollfd + 6 >> 1] = mask
         }
-        return nonzero
-      } catch (e) {
-        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
-        return -e.errno
+        mask &= events | POLLERR | POLLHUP;
+        if (mask) nonzero++;
+        HEAP16[pollfd + 6 >> 1] = mask;
       }
+
+      // If no FDs are ready, wait for PTY data or timeout.
+      if (nonzero === 0 && timeoutSec !== 0) {
+        return new Promise(resolve => {
+          var timeoutId;
+          var handler = PTY.onReadable(() => {
+            handler.dispose();
+            clearTimeout(timeoutId);
+            resolve(0);
+          });
+          if (timeoutSec > 0) {
+            timeoutId = setTimeout(() => {
+              handler.dispose();
+              resolve(0);
+            }, Math.min(timeoutSec * 1000, 30000));
+          }
+        });
+      }
+
+      return nonzero;
     }
 
     function ___syscall_pselect6_scan(nfds, readfdsP, writefdsP, exceptfdsP, tmSec, tmNsec, sigmaskP) {
@@ -15565,6 +15766,109 @@ var Module = (() => {
         return -e.errno
       }
     }
+    function ___syscall_chmod(path, mode) {
+      try {
+        path = SYSCALLS.getStr(path);
+        FS.chmod(path, mode);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function ___syscall_fchmod(fd, mode) {
+      try {
+        FS.fchmod(fd, mode);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function ___syscall_fchmodat(dirfd, path, mode, flags) {
+      try {
+        var nofollow = flags & 256;
+        path = SYSCALLS.getStr(path);
+        path = SYSCALLS.calculateAt(dirfd, path);
+        FS.chmod(path, mode, nofollow);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function ___syscall_fchownat(dirfd, path, owner, group, flags) {
+      try {
+        path = SYSCALLS.getStr(path);
+        var nofollow = flags & 256;
+        flags = flags & ~256;
+        path = SYSCALLS.calculateAt(dirfd, path);
+        (nofollow ? FS.lchown : FS.chown)(path, owner, group);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function ___syscall_fdatasync(fd) {
+      try {
+        var stream = SYSCALLS.getStreamFromFD(fd);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function ___syscall_renameat(olddirfd, oldpath, newdirfd, newpath) {
+      try {
+        oldpath = SYSCALLS.getStr(oldpath);
+        newpath = SYSCALLS.getStr(newpath);
+        oldpath = SYSCALLS.calculateAt(olddirfd, oldpath);
+        newpath = SYSCALLS.calculateAt(newdirfd, newpath);
+        FS.rename(oldpath, newpath);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function ___syscall_symlinkat(target, dirfd, linkpath) {
+      try {
+        target = SYSCALLS.getStr(target);
+        linkpath = SYSCALLS.getStr(linkpath);
+        linkpath = SYSCALLS.calculateAt(dirfd, linkpath);
+        FS.symlink(target, linkpath);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return -e.errno
+      }
+    }
+
+    function _fd_fdstat_get(fd, pbuf) {
+      try {
+        var rightsBase = 0;
+        var rightsInheriting = 0;
+        var flags = 0;
+        var stream = SYSCALLS.getStreamFromFD(fd);
+        var type = stream.tty ? 2 : FS.isDir(stream.mode) ? 3 : FS.isLink(stream.mode) ? 7 : 4;
+        (growMemViews(gWasmMemory), HEAP8)[pbuf] = type;
+        (growMemViews(gWasmMemory), HEAP16)[pbuf + 2 >> 1] = flags;
+        (growMemViews(gWasmMemory), HEAP64)[pbuf + 8 >> 3] = BigInt(rightsBase);
+        (growMemViews(gWasmMemory), HEAP64)[pbuf + 16 >> 3] = BigInt(rightsInheriting);
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return e.errno
+      }
+    }
+
     var runtimeKeepaliveCounter = 0;
     var ENV = {};
     var getExecutableName = () => initProcessJsPath;
@@ -15678,7 +15982,6 @@ var Module = (() => {
 
     function _fd_read(fd, iov, iovcnt, pnum) {
       try {
-        // console.log(`fd_read (js-kernel). fd: ${fd}`);
         var stream = SYSCALLS.getStreamFromFD(fd);
         var num = doReadv(stream, iov, iovcnt);
         (growMemViews(gWasmMemory), HEAPU32)[pnum >> 2] = num;
@@ -15740,6 +16043,19 @@ var Module = (() => {
         return e.errno
       }
     }
+    function _fd_pread(fd, iov, iovcnt, offset, pnum) {
+      offset = bigintToI53Checked(offset);
+      try {
+        if (isNaN(offset)) return 61;
+        var stream = SYSCALLS.getStreamFromFD(fd);
+        var num = doReadv(stream, iov, iovcnt, offset);
+        (growMemViews(gWasmMemory), HEAPU32)[pnum >> 2] = num;
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return e.errno
+      }
+    }
     var doWritev = (stream, iov, iovcnt, offset) => {
       var ret = 0;
       for (var i = 0; i < iovcnt; i++) {
@@ -15758,6 +16074,19 @@ var Module = (() => {
       }
       return ret
     };
+    function _fd_pwrite(fd, iov, iovcnt, offset, pnum) {
+      offset = bigintToI53Checked(offset);
+      try {
+        if (isNaN(offset)) return 61;
+        var stream = SYSCALLS.getStreamFromFD(fd);
+        var num = doWritev(stream, iov, iovcnt, offset);
+        (growMemViews(gWasmMemory), HEAPU32)[pnum >> 2] = num;
+        return 0
+      } catch (e) {
+        if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+        return e.errno
+      }
+    }
 
     function _fd_write(fd, iov, iovcnt, pnum) {
       try {
@@ -15836,12 +16165,8 @@ var Module = (() => {
           Module["pythonLibrariesLoaded"] = true;
           console.log("Loading Python libraries after initRuntime...");
           Module["loadPackage"](Module["pythonLibraryMetadata"]);
-
-          // Wait for data loading if there are dependencies
           if (runDependencies > 0) {
-            await new Promise(resolve => {
-              dependenciesFulfilled = resolve;
-            });
+            await new Promise(resolve => { dependenciesFulfilled = resolve; });
           }
         }
 
